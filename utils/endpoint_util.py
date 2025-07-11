@@ -17,7 +17,9 @@ class Endpoint:
     """
 
     @staticmethod
-    def get_endpoint_api_key(endpoint_name: str, account_api_key: str) -> Optional[str]:
+    def get_endpoint_api_key(
+        endpoint_name: str, account_api_key: str, instance: str
+    ) -> Optional[str]:
         """
         Fetch endpoint API key from VastAI console following the healthcheck pattern.
 
@@ -33,7 +35,9 @@ class Endpoint:
 
         try:
             log.debug(f"Fetching endpoint API key for endpoint: {endpoint_name}")
-            response = requests.get(vast_console_url, headers=headers)
+            response = requests.get(
+                f"{vast_console_url}?autoscaler_instance={instance}", headers=headers
+            )
 
             if response.status_code != 200:
                 error_msg = f"Failed to fetch endpoint API key: {response.status_code} - {response.text}"

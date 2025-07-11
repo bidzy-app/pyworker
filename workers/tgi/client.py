@@ -100,6 +100,7 @@ if __name__ == "__main__":
     endpoint_api_key = Endpoint.get_endpoint_api_key(
         endpoint_name=args.endpoint_group_name,
         account_api_key=args.api_key,
+        instance=args.instance,
     )
     if endpoint_api_key:
         try:

@@ -53,6 +53,13 @@ test_args.add_argument(
     default="https://run.vast.ai",
     help="Call local autoscaler instead of prod, for dev use only",
 )
+test_args.add_argument(
+    "-i",
+    dest="instance",
+    type=str,
+    default="prod",
+    help="Autoscaler shard to run the command against, default: prod",
+)
 
 GetPayloadAndWorkload = Callable[[], Tuple[Dict[str, Any], float]]
 
@@ -70,6 +77,7 @@ class ClientState:
     api_key: str
     server_url: str
     worker_endpoint: str
+    instance: str
     payload: ApiPayload
     url: str = ""
     status: ClientStatus = ClientStatus.FetchEndpoint
@@ -79,11 +87,7 @@ class ClientState:
 
     def make_call(self):
         self.status = ClientStatus.FetchEndpoint
-        endpoint_api_key = Endpoint.get_endpoint_api_key(
-            endpoint_name=self.endpoint_group_name,
-            account_api_key=self.api_key,
-        )
-        if not endpoint_api_key:
+        if not self.api_key:
             self.as_error.append(
                 f"Endpoint {self.endpoint_group_name} not found for API key",
             )
@@ -91,12 +95,14 @@ class ClientState:
             return
         route_payload = {
             "endpoint": self.endpoint_group_name,
-            "api_key": endpoint_api_key,
+            "api_key": self.api_key,
             "cost": self.payload.count_workload(),
         }
+        headers = {"Authorization": f"Bearer {self.api_key}"}
         response = requests.post(
             urljoin(self.server_url, "/route/"),
             json=route_payload,
+            headers=headers,
             timeout=4,
         )
         if response.status_code != 200:
@@ -135,6 +141,7 @@ class ClientState:
         try:
             self.make_call()
         except Exception as e:
+            print(e)
             self.status = ClientStatus.Error
             _ = e
             self.conn_errors[self.url] += 1
@@ -226,6 +233,7 @@ def run_test(
     server_url: str,
     worker_endpoint: str,
     payload_cls: Type[ApiPayload],
+    instance: str,
 ):
     threads = []
 
@@ -234,8 +242,7 @@ def run_test(
     print_thread.daemon = True  # makes threads get killed on program exit
     print_thread.start()
     endpoint_api_key = Endpoint.get_endpoint_api_key(
-        endpoint_name=endpoint_group_name,
-        account_api_key=api_key,
+        endpoint_name=endpoint_group_name, account_api_key=api_key, instance=instance
     )
     if not endpoint_api_key:
         log.debug(f"Endpoint {endpoint_group_name} not found for API key")
@@ -248,6 +255,7 @@ def run_test(
                 server_url=server_url,
                 worker_endpoint=worker_endpoint,
                 payload=payload_cls.for_test(),
+                instance=instance,
             )
             clients.append(client)
             thread = threading.Thread(target=client.simulate_user, args=())
@@ -281,12 +289,19 @@ def test_load_cmd(
     args = arg_parser.parse_args()
     if hasattr(args, "comfy_model"):
         os.environ["COMFY_MODEL"] = args.comfy_model
+    server_url = dict(
+        prod="https://run.vast.ai",
+        alpha="https://run-alpha.vast.ai",
+        candidate="https://run-candidate.vast.ai",
+        local="http://localhost:8080",
+    )[args.instance]
     run_test(
         num_requests=args.num_requests,
         requests_per_second=args.requests_per_second,
         api_key=args.api_key,
-        server_url=args.server_url,
+        server_url=server_url,
         endpoint_group_name=args.endpoint_group_name,
         worker_endpoint=endpoint,
         payload_cls=payload_cls,
+        instance=args.instance,
     )

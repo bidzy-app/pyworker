@@ -87,17 +87,17 @@ if [ "$USE_SSL" = true ]; then
     IP.1   = 0.0.0.0
 EOF
 
-openssl req -newkey rsa:2048 -subj "/C=US/ST=CA/CN=pyworker.vast.ai/" \
-    -nodes \
-    -sha256 \
-    -keyout /etc/instance.key \
-    -out /etc/instance.csr \
-    -config /etc/openssl-san.cnf
+    openssl req -newkey rsa:2048 -subj "/C=US/ST=CA/CN=pyworker.vast.ai/" \
+        -nodes \
+        -sha256 \
+        -keyout /etc/instance.key \
+        -out /etc/instance.csr \
+        -config /etc/openssl-san.cnf
 
-curl --header 'Content-Type: application/octet-stream' \
-    --data-binary @//etc/instance.csr \
-    -X \
-    POST "https://console.vast.ai/api/v0/sign_cert/?instance_id=$CONTAINER_ID" > /etc/instance.crt;
+    curl --header 'Content-Type: application/octet-stream' \
+        --data-binary @//etc/instance.csr \
+        -X \
+        POST "https://console.vast.ai/api/v0/sign_cert/?instance_id=$CONTAINER_ID" > /etc/instance.crt;
 fi
 
 
