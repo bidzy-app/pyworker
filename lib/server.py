@@ -27,7 +27,7 @@ def start_server(backend: Backend, routes: List[web.RouteDef], **kwargs):
         log.debug("starting server...")
         app = web.Application()
         app.add_routes(routes)
-        runner = web.AppRunner(app)
+        runner = web.AppRunner(app, handler_cancellation=True)
         await runner.setup()
         site = web.TCPSite(
             runner,

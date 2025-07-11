@@ -5,7 +5,7 @@ import base64
 import subprocess
 import dataclasses
 import logging
-from asyncio import wait, sleep, gather, Semaphore, FIRST_COMPLETED, create_task
+from asyncio import sleep, gather, Semaphore
 from typing import Tuple, Awaitable, NoReturn, List, Union, Callable, Optional
 from functools import cached_property
 
@@ -119,16 +119,6 @@ class Backend:
             return web.json_response(dict(error="invalid JSON"), status=422)
         workload = payload.count_workload()
 
-        async def wait_for_disconnection() -> None:
-            while request.transport and not request.transport.is_closing():
-                await sleep(0.5)
-
-        async def cancel_api_call_if_disconnected() -> web.Response:
-            await wait_for_disconnection()
-            log.debug(f"request with reqnum: {auth_data.reqnum} was canceled")
-            self.metrics._request_canceled(workload=workload, reqnum=auth_data.reqnum)
-            return web.Response(status=500)
-
         async def make_request() -> Union[web.Response, web.StreamResponse]:
             log.debug(f"got request, {auth_data.reqnum}")
             self.metrics._request_start(workload=workload, reqnum=auth_data.reqnum)
@@ -174,18 +164,16 @@ class Backend:
             return web.Response(status=401)
 
         try:
-            done, pending = await wait(
-                [
-                    create_task(make_request()),
-                    create_task(cancel_api_call_if_disconnected()),
-                ],
-                return_when=FIRST_COMPLETED,
-            )
-            [task.cancel() for task in pending]
-            return done.pop().result()
+            return await make_request()
         except Exception as e:
             log.debug(f"Exception in main handler loop {e}")
             return web.Response(status=500)
+        finally:
+            if request.task.cancelled():
+                log.debug(f"request with reqnum: {auth_data.reqnum} was canceled")
+                self.metrics._request_canceled(
+                    workload=workload, reqnum=auth_data.reqnum
+                )
 
     async def __healthcheck(self):
         health_check_url = self.benchmark_handler.healthcheck_endpoint
