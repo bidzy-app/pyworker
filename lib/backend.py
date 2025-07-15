@@ -8,6 +8,7 @@ import logging
 from asyncio import sleep, gather, Semaphore
 from typing import Tuple, Awaitable, NoReturn, List, Union, Callable, Optional
 from functools import cached_property
+from distutils.util import strtobool
 
 from anyio import open_file
 from aiohttp import web, ClientResponse, ClientSession, ClientConnectorError
@@ -55,6 +56,9 @@ class Backend:
     reqnum = -1
     msg_history = []
     sem: Semaphore = dataclasses.field(default_factory=Semaphore)
+    unsecured: bool = dataclasses.field(
+        default_factory=lambda: bool(strtobool(os.environ.get("UNSECURED", "false"))),
+    )
 
     def __post_init__(self):
         self.metrics = Metrics()
@@ -217,6 +221,9 @@ class Backend:
         return await self.session.post(url=handler.endpoint, json=api_payload)
 
     def __check_signature(self, auth_data: AuthData) -> bool:
+        if self.unsecured is True:
+            return True
+
         def verify_signature(message, signature):
             if self.pubkey is None:
                 log.debug(f"No Public Key!")
