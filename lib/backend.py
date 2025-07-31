@@ -126,7 +126,7 @@ class Backend:
         async def cancel_api_call_if_disconnected() -> web.Response:
             await request.wait_for_disconnection()
             log.debug(f"request with reqnum: {auth_data.reqnum} was canceled")
-            self.metrics._request_canceled(workload=workload, reqnum=auth_data.reqnum)
+            self.metrics._request_canceled(workload=workload)
             return web.Response(status=500)
 
         async def make_request() -> Union[web.Response, web.StreamResponse]:
@@ -141,7 +141,6 @@ class Backend:
             else:
                 log.debug(f"Starting request for reqnum:{auth_data.reqnum}")
             try:
-                start_time = time.time()
                 response = await self.__call_api(handler=handler, payload=payload)
                 status_code = response.status
                 log.debug(
@@ -153,19 +152,17 @@ class Backend:
                     )
                 )
                 res = await handler.generate_client_response(request, response)
-                self.metrics._request_end(
-                    workload=workload,
-                    req_response_time=time.time() - start_time,
-                    reqnum=auth_data.reqnum,
-                )
+                self.metrics._request_success(workload=workload)
                 return res
             except requests.exceptions.RequestException as e:
                 log.debug(f"[backend] Request error: {e}")
-                self.metrics._request_errored(
-                    workload=workload, reqnum=auth_data.reqnum
-                )
+                self.metrics._request_errored(workload=workload)
                 return web.Response(status=500)
             finally:
+                self.metrics._request_end(
+                    workload=workload,
+                    reqnum=auth_data.reqnum,
+                )
                 self.sem.release()
 
         ###########
@@ -186,12 +183,6 @@ class Backend:
         except Exception as e:
             log.debug(f"Exception in main handler loop {e}")
             return web.Response(status=500)
-        finally:
-            if request.task.cancelled():
-                log.debug(f"request with reqnum: {auth_data.reqnum} was canceled")
-                self.metrics._request_canceled(
-                    workload=workload, reqnum=auth_data.reqnum
-                )
 
     async def __healthcheck(self):
         health_check_url = self.benchmark_handler.healthcheck_endpoint

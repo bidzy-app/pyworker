@@ -8,7 +8,6 @@ from aiohttp import web, ClientResponse
 import inspect
 
 import psutil
-import requests
 
 
 """
@@ -206,13 +205,13 @@ class ModelMetrics:
     workload_received: float
     workload_cancelled: float
     workload_errored: float
-    workload_pending: float
     # these are not
-    cur_perf: float
+    workload_pending: float
     error_msg: Optional[str]
     max_throughput: float
     requests_recieved: Set[int] = field(default_factory=set)
     requests_working: Set[int] = field(default_factory=set)
+    last_update: float = field(default_factory=time.time)
 
     @classmethod
     def empty(cls):
@@ -221,11 +220,14 @@ class ModelMetrics:
             workload_served=0.0,
             workload_cancelled=0.0,
             workload_errored=0.0,
-            cur_perf=0.0,
             workload_received=0.0,
             error_msg=None,
             max_throughput=0.0,
         )
+
+    @property
+    def cur_perf(self) -> float:
+        return max(self.workload_served / (time.time() - self.last_update), 0.0)
 
     @property
     def workload_processing(self) -> float:
@@ -240,6 +242,7 @@ class ModelMetrics:
         self.workload_received = 0
         self.workload_cancelled = 0
         self.workload_errored = 0
+        self.last_update = time.time()
 
 
 @dataclass
