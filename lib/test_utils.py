@@ -10,6 +10,7 @@ from collections import Counter
 from dataclasses import dataclass, field, asdict
 from urllib.parse import urljoin
 from utils.endpoint_util import Endpoint
+from utils.ssl import get_cert_file_path
 import requests
 
 from lib.data_types import AuthData, ApiPayload
@@ -120,9 +121,11 @@ class ClientState:
         self.url = worker_address
         url = urljoin(worker_address, self.worker_endpoint)
         self.status = ClientStatus.Generating
+
         response = requests.post(
             url,
             json=req_data,
+            verify=get_cert_file_path(),
         )
         if response.status_code != 200:
             self.infer_error.append(

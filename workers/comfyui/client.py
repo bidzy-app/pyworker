@@ -5,6 +5,7 @@ import requests
 
 from lib.test_utils import print_truncate_res
 from utils.endpoint_util import Endpoint
+from utils.ssl import get_cert_file_path
 
 """
 NOTE: this client example uses a custom comfy workflow compatible with SD3 only
@@ -51,6 +52,7 @@ def call_default_workflow(
     response = requests.post(
         url,
         json=req_data,
+        verify=get_cert_file_path(),
     )
     response.raise_for_status()
     print_truncate_res(str(response.json()))
@@ -141,6 +143,7 @@ def call_custom_workflow_for_sd3(
     response = requests.post(
         url,
         json=req_data,
+        verify=get_cert_file_path(),
     )
     response.raise_for_status()
     print_truncate_res(str(response.json()))

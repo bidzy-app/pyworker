@@ -4,6 +4,7 @@ import json
 from urllib.parse import urljoin
 import requests
 from utils.endpoint_util import Endpoint
+from utils.ssl import get_cert_file_path
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -42,7 +43,11 @@ def call_generate(endpoint_group_name: str, api_key: str, server_url: str) -> No
     req_data = dict(payload=payload, auth_data=auth_data)
     url = urljoin(url, WORKER_ENDPOINT)
     print(f"url: {url}")
-    response = requests.post(url, json=req_data)
+    response = requests.post(
+        url,
+        json=req_data,
+        verify=get_cert_file_path(),
+    )
     response.raise_for_status()
     res = response.json()
     print(res)

@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 from typing import Dict, Any, Optional, Iterator, Union, List
 import requests
 from utils.endpoint_util import Endpoint
+from utils.ssl import get_cert_file_path
 from .data_types.client import CompletionConfig, ChatCompletionConfig
 
 logging.basicConfig(
@@ -90,9 +91,13 @@ class APIClient:
 
         # Make the request using the specified method
         if method.upper() == "POST":
-            response = requests.post(url, json=req_data, stream=stream)
+            response = requests.post(
+                url, json=req_data, stream=stream, verify=get_cert_file_path()
+            )
         elif method.upper() == "GET":
-            response = requests.get(url, params=req_data, stream=stream)
+            response = requests.get(
+                url, params=req_data, stream=stream, verify=get_cert_file_path()
+            )
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
 
