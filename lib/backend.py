@@ -280,41 +280,52 @@ class Backend:
                     return float(f.readline())
             except FileNotFoundError:
                 pass
+
+            log.debug("Initial run to trigger model loading...")
+            payload = self.benchmark_handler.make_benchmark_payload()
+            await self.__call_api(handler=self.benchmark_handler, payload=payload)
+
             max_throughput = 0
-            last_throughput = 0
             sum_throughput = 0
-            for run in range(self.benchmark_handler.benchmark_runs + 1):
+            concurrent_requests = 10 if self.allow_parallel_requests else 1
+
+            for run in range(1, self.benchmark_handler.benchmark_runs + 1):
                 start = time.time()
-                payload = self.benchmark_handler.make_benchmark_payload()
-                res = await self.__call_api(
-                    handler=self.benchmark_handler, payload=payload
-                )
-                data = await res.json()
-                time_elapsed = time.time() - start
-                # first run triggers one-time loading of the model which is very slow, so we skip counting it
-                if run == 0:
-                    continue
-                else:
-                    workload = payload.count_workload()
-                    last_throughput = workload / time_elapsed
-                    sum_throughput += last_throughput
-                    max_throughput = max(max_throughput, last_throughput)
-                    log.debug(
-                        "\n".join(
-                            [
-                                "#" * 60,
-                                f"Run: {run}, workload: {workload} time_elapsed: {time_elapsed}, throughput: {last_throughput}",
-                                "",
-                                f"response: {data}",
-                                "#" * 60,
-                            ]
-                        )
+                tasks = []
+                total_workload = 0
+
+                for _ in range(concurrent_requests):
+                    payload = self.benchmark_handler.make_benchmark_payload()
+                    total_workload += payload.count_workload()
+                    tasks.append(
+                        self.__call_api(handler=self.benchmark_handler, payload=payload)
                     )
+
+                responses = await gather(*tasks)
+                time_elapsed = time.time() - start
+
+                throughput = total_workload / time_elapsed
+                sum_throughput += throughput
+                max_throughput = max(max_throughput, throughput)
+
+                # Log results for debugging
+                log.debug(
+                    "\n".join(
+                        [
+                            "#" * 60,
+                            f"Run: {run}, concurrent_requests: {concurrent_requests}",
+                            f"Total workload: {total_workload}, time_elapsed: {time_elapsed}s",
+                            f"Throughput: {throughput} workload/s",
+                            f"Successful responses: {len([r for r in responses if r.status == 200])}",
+                            "#" * 60,
+                        ]
+                    )
+                )
+
             average_throughput = sum_throughput / self.benchmark_handler.benchmark_runs
             log.debug(
                 f"benchmark result: avg {average_throughput} workload per second, max {max_throughput}"
             )
-            # save max_throughput so we don't have to run benchmark again on restart of cold instances
             with open(BENCHMARK_INDICATOR_FILE, "w") as f:
                 f.write(str(max_throughput))
             return max_throughput
