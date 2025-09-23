@@ -39,7 +39,7 @@ install_python_packages() {
   local PIP="${PIP:-/opt/micromamba/envs/comfyui/bin/pip}"
   echo "[wan_talk] installing python dependencies"
   "$PIP" install --upgrade --no-cache-dir \
-    packaging librosa "numpy==1.26.4" moviepy "pillow>=10.3.0" scipy \
+    packaging librosa "numpy==1.26.4" moviepy \
     color-matcher matplotlib huggingface_hub mss opencv-python ftfy \
     "accelerate>=1.2.1" einops "diffusers>=0.33.0" "peft>=0.17.0" \
     "sentencepiece>=0.2.0" protobuf pyloudnorm "gguf>=0.14.0" imageio-ffmpeg \
