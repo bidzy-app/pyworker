@@ -22,15 +22,20 @@ COMFY_ROOT="${COMFY_ROOT:-${COMFY_WORKSPACE}/ComfyUI}"
 CUSTOM_NODE_DIR="$COMFY_ROOT/custom_nodes"
 
 echo "[wan_talk/setup] Preparing ComfyUI workspace at ${COMFY_WORKSPACE}"
-mkdir -p "$COMFY_WORKSPACE"
+mkdir -p "$(dirname "$COMFY_WORKSPACE")"
 
-if [ ! -d "$COMFY_ROOT" ]; then
-  echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
+# Удаляем старый workspace, если он существует
+if [ -d "$COMFY_WORKSPACE" ]; then
+    echo "[wan_talk/setup] Removing existing ComfyUI workspace at $COMFY_WORKSPACE"
+    rm -rf "$COMFY_WORKSPACE"
+fi
 
-  # GPU выбор (по умолчанию nvidia)
-  GPU_CHOICE="${WAN_GPU_CHOICE:-nvidia}"
+echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
 
-  case "$GPU_CHOICE" in
+# GPU выбор (по умолчанию nvidia)
+GPU_CHOICE="${WAN_GPU_CHOICE:-nvidia}"
+
+case "$GPU_CHOICE" in
     nvidia) GPU_FLAG="--nvidia" ;;
     amd)    GPU_FLAG="--amd" ;;
     cpu)    GPU_FLAG="--cpu" ;;
@@ -38,19 +43,17 @@ if [ ! -d "$COMFY_ROOT" ]; then
       echo "[wan_talk/setup] Unknown GPU choice: $GPU_CHOICE"
       exit 1
       ;;
-  esac
+esac
 
-  # Non-interactive установка
-  comfy --skip-prompt --no-enable-telemetry \
-        --workspace="$COMFY_WORKSPACE" \
-        install $GPU_FLAG
-else
-  echo "[wan_talk/setup] ComfyUI already present at ${COMFY_ROOT}; skipping install"
-fi
+# Non-interactive установка ComfyUI
+comfy --skip-prompt --no-enable-telemetry \
+      --workspace="$COMFY_WORKSPACE" \
+      install $GPU_FLAG
 
+# Установка Python зависимостей
 COMFY_REQUIREMENTS="$COMFY_ROOT/requirements.txt"
 if [ -f "$COMFY_REQUIREMENTS" ]; then
-  echo "[wan_talk/setup] Ensuring ComfyUI Python dependencies are installed"
+  echo "[wan_talk/setup] Installing ComfyUI Python dependencies"
   python -m pip install --no-cache-dir -r "$COMFY_REQUIREMENTS"
 fi
 
@@ -60,6 +63,7 @@ if [ -f "$WAN_TALK_REQUIREMENTS" ]; then
   python -m pip install --no-cache-dir -r "$WAN_TALK_REQUIREMENTS"
 fi
 
+# Клонирование кастомных нод
 clone_node() {
   local repo_url="$1"
   local repo_name
@@ -91,6 +95,7 @@ for repo in "${CUSTOM_NODE_LIST[@]}"; do
   clone_node "$repo"
 done
 
+# Отключение трекинга и установка дефолтного workspace
 echo "[wan_talk/setup] Disabling comfy CLI tracking"
 comfy tracking disable || true
 
