@@ -5,7 +5,7 @@ set -euo pipefail
 : "${COMFY_WORKSPACE:?COMFY_WORKSPACE must be set}"
 : "${COMFY_LAUNCH_EXTRAS:?COMFY_LAUNCH_EXTRAS must be set}"
 
-if ! command -v comfy >/dev/null 2>&1; then
+if ! command- v comfy >/dev/null 2>&1; then
   echo "[wan_talk/setup] comfy-cli executable not found; ensure requirements were installed." >&2
   exit 1
 fi
@@ -31,10 +31,13 @@ set timeout -1
 set workspace $env(COMFY_WORKSPACE)
 set install_cmd [format "comfy --workspace=%s install" $workspace]
 
-# запуск через script => CLI видит полноценный TTY, questionary не падает
 spawn script -qfc $install_cmd /dev/null
 
 expect {
+    -re {\x1b\[6n} {
+        send -- "\x1b[1;1R"
+        exp_continue
+    }
     -re {Do you agree to enable tracking.*} {
         send -- "n\r"
         exp_continue
