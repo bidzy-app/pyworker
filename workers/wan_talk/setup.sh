@@ -42,9 +42,13 @@ clone_node() {
 }
 
 install_python_packages() {
-  local PIP="${PIP:-/opt/micromamba/envs/comfyui/bin/pip}"
-  echo "[wan_talk] installing python dependencies"
-  "$PIP" install --upgrade --no-cache-dir \
+  # если PIP явно не задан, берём тот, что находится в PATH (для worker-env)
+  local PIP_BIN="${PIP:-$(command -v pip)}"
+  echo "[wan_talk] installing python dependencies with ${PIP_BIN}"
+
+  "$PIP_BIN" install --upgrade --no-cache-dir \
+    pillow \
+    scipy \
     packaging librosa "numpy==1.26.4" moviepy \
     color-matcher matplotlib huggingface_hub mss opencv-python ftfy \
     "accelerate>=1.2.1" einops "diffusers>=0.33.0" "peft>=0.17.0" \
