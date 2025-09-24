@@ -12,21 +12,10 @@ PYWORKER_LOG="$WORKSPACE_DIR/pyworker.log"
 REPORT_ADDR="${REPORT_ADDR:-https://cloud.vast.ai/api/v0,https://run.vast.ai}"
 USE_SSL="${USE_SSL:-true}"
 WORKER_PORT="${WORKER_PORT:-3000}"
-
-COMFY_WORKSPACE="${COMFY_WORKSPACE:-$WORKSPACE_DIR/comfy-workspace}"
-COMFY_HOST="${COMFY_HOST:-127.0.0.1}"
-COMFY_PORT="${COMFY_PORT:-18288}"
-COMFY_LAUNCH_EXTRAS="${COMFY_LAUNCH_EXTRAS:="--listen ${COMFY_HOST} --port ${COMFY_PORT}"}"
-MODEL_SERVER_URL="${MODEL_SERVER_URL:-http://${COMFY_HOST}:${COMFY_PORT}}"
-
-export WORKSPACE_DIR SERVER_DIR ENV_PATH DEBUG_LOG PYWORKER_LOG
-export REPORT_ADDR USE_SSL WORKER_PORT
-export COMFY_WORKSPACE COMFY_HOST COMFY_PORT COMFY_LAUNCH_EXTRAS MODEL_SERVER_URL
-
 mkdir -p "$WORKSPACE_DIR"
-mkdir -p "$COMFY_WORKSPACE"
 cd "$WORKSPACE_DIR"
 
+# make all output go to $DEBUG_LOG and stdout without having to add `... | tee -a $DEBUG_LOG` to every command
 exec &> >(tee -a "$DEBUG_LOG")
 
 function echo_var(){
@@ -50,11 +39,8 @@ echo_var ENV_PATH
 echo_var DEBUG_LOG
 echo_var PYWORKER_LOG
 echo_var MODEL_LOG
-echo_var COMFY_WORKSPACE
-echo_var COMFY_HOST
-echo_var COMFY_PORT
-echo_var MODEL_SERVER_URL
 
+# Populate /etc/environment with quoted values
 if ! grep -q "VAST" /etc/environment; then
     env -0 | grep -zEv "^(HOME=|SHLVL=)|CONDA" | while IFS= read -r -d '' line; do
             name=${line%%=*}
@@ -71,6 +57,7 @@ then
         source ~/.local/bin/env
     fi
 
+    # Fork testing
     [[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/bidzy-app/pyworker}" "$SERVER_DIR"
     if [[ -n ${PYWORKER_REF:-} ]]; then
         (cd "$SERVER_DIR" && git checkout "$PYWORKER_REF")
@@ -89,6 +76,7 @@ else
     echo "venv: $VIRTUAL_ENV"
 fi
 
+# Backend-specific bootstrap (models, custom nodes, etc.)
 if [ "$BACKEND" = "wan_talk" ]; then
     SETUP_SCRIPT="$SERVER_DIR/workers/wan_talk/setup.sh"
     if [ -x "$SETUP_SCRIPT" ]; then
@@ -104,6 +92,7 @@ fi
 [ ! -d "$SERVER_DIR/workers/$BACKEND" ] && echo "$BACKEND not supported!" && exit 1
 
 if [ "$USE_SSL" = true ]; then
+
     cat << EOF > /etc/openssl-san.cnf
     [req]
     default_bits       = 2048
@@ -145,6 +134,8 @@ cd "$SERVER_DIR"
 
 echo "launching PyWorker server"
 
+# if instance is rebooted, we want to clear out the log file so pyworker doesn't read lines
+# from the run prior to reboot. past logs are saved in $MODEL_LOG.old for debugging only
 [ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
 
 (python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
