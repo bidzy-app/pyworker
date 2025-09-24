@@ -5,8 +5,9 @@ set -euo pipefail
 : "${COMFY_WORKSPACE:?COMFY_WORKSPACE must be set}"
 : "${COMFY_LAUNCH_EXTRAS:?COMFY_LAUNCH_EXTRAS must be set}"
 
-if ! command- v comfy >/dev/null 2>&1; then
-  echo "[wan_talk/setup] comfy-cli executable not found; ensure requirements were installed." >&2
+hash -r
+if ! command -v comfy >/dev/null 2>&1; then
+  echo "[wan_talk/setup] comfy-cli executable not found; install it via requirements before running setup." >&2
   exit 1
 fi
 
@@ -29,7 +30,7 @@ if [ ! -d "$COMFY_ROOT" ]; then
   /usr/bin/expect <<'EXPECT'
 set timeout -1
 set workspace $env(COMFY_WORKSPACE)
-set install_cmd [format "comfy --workspace=%s install" $workspace]
+set install_cmd [format {comfy --workspace=%s install} $workspace]
 
 spawn script -qfc $install_cmd /dev/null
 
