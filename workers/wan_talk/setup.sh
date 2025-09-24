@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v aria2c >/dev/null 2>&1; then
+  echo "[wan_talk] installing aria2"
+  apt-get update
+  apt-get install -y --no-install-recommends aria2
+fi
+
 COMFY_ROOT="${COMFY_ROOT:-/workspace/ComfyUI}"
 CUSTOM_NODE_DIR="$COMFY_ROOT/custom_nodes"
 
