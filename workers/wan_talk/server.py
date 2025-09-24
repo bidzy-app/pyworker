@@ -112,11 +112,14 @@ class WanTalkHandler(EndpointHandler[WanTalkPayload]):
         return await _prepare_response(client_request, model_response)
 
 
+benchmark_handler = WanTalkHandler(benchmark_runs=3, benchmark_words=100)
+generate_handler = WanTalkHandler()
+
 backend = Backend(
     model_server_url=MODEL_SERVER_URL,
     model_log_file=os.environ["MODEL_LOG"],
     allow_parallel_requests=False,
-    benchmark_handler=WanTalkHandler(benchmark_runs=3, benchmark_words=100),
+    benchmark_handler=benchmark_handler,
     log_actions=[
         (LogAction.ModelLoaded, MODEL_SERVER_START_LOG_MSG),
         (LogAction.Info, "Downloading:"),
@@ -130,8 +133,9 @@ async def handle_ping(_: web.Request) -> web.Response:
 
 
 routes = [
-    web.post("/wan-talk", backend.create_handler(WanTalkHandler())),
     web.get("/ping", handle_ping),
+    web.post("/generate", backend.create_handler(generate_handler)),
+    web.post("/generate/", backend.create_handler(generate_handler)),
 ]
 
 if __name__ == "__main__":
