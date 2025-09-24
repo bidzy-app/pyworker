@@ -11,10 +11,10 @@ if ! command -v comfy >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v aria2c >/dev/null 2>&1 || ! command -v expect >/dev/null 2>&1; then
-  echo "[wan_talk/setup] installing apt packages: aria2 expect"
+if ! command -v aria2c >/dev/null 2>&1; then
+  echo "[wan_talk/setup] installing apt packages: aria2"
   apt-get update
-  apt-get install -y --no-install-recommends aria2 expect
+  apt-get install -y --no-install-recommends aria2
   apt-get clean
 fi
 
@@ -27,63 +27,13 @@ mkdir -p "$COMFY_WORKSPACE"
 if [ ! -d "$COMFY_ROOT" ]; then
   echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
 
-  /usr/bin/expect <<'EXPECT'
-set timeout -1
+  # GPU выбор — по умолчанию nvidia
+  GPU_CHOICE="${WAN_GPU_CHOICE:-nvidia}"
 
-# настройки окружения для комфортного вопросника
-set env(PROMPT_TOOLKIT_NO_CPR) 1
-set env(TERM) "xterm-256color"
-
-set workspace $env(COMFY_WORKSPACE)
-set gpu_choice [expr {[info exists env(WAN_GPU_CHOICE)] ? $env(WAN_GPU_CHOICE) : "nvidia"}]
-set asked_gpu 0
-
-spawn comfy --workspace=$workspace install
-expect {
-    -re {Do you agree to enable tracking.*} {
-        send -- "n\r"
-        exp_continue
-    }
-    -re {\? What GPU do you have\?.*} {
-        if {!$asked_gpu} {
-            send -- "$gpu_choice\r"
-            set asked_gpu 1
-        } else {
-            send -- "\r"
-        }
-        exp_continue
-    }
-    -re {Install from .* \[y/N\]:} {
-        send -- "y\r"
-        exp_continue
-    }
-    -re {Proceed with installation\? \[y/N\]:} {
-        send -- "y\r"
-        exp_continue
-    }
-    -re {\[y/N\]:} {
-        send -- "\r"
-        exp_continue
-    }
-    -re {\?\s*$} {
-        # Любые другие вопросы — жмём Enter, чтобы выбрать дефолт
-        send -- "\r"
-        exp_continue
-    }
-    timeout {
-        puts stderr "comfy install timed out waiting for input"
-        exit 1
-    }
-    eof
-}
-
-set wait_status [wait]
-set exit_status [lindex $wait_status 3]
-if {$exit_status != 0} {
-    exit $exit_status
-}
-EXPECT
-
+  # Non-interactive установка comfy
+  comfy --skip-prompt --no-enable-telemetry \
+        --workspace="$COMFY_WORKSPACE" \
+        install --gpu "$GPU_CHOICE" --yes
 else
   echo "[wan_talk/setup] ComfyUI already present at ${COMFY_ROOT}; skipping install"
 fi
