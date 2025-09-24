@@ -27,10 +27,10 @@ mkdir -p "$COMFY_WORKSPACE"
 if [ ! -d "$COMFY_ROOT" ]; then
   echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
 
-  # Non-interactive установка comfy
+  # Non-interactive установка comfy (без --gpu и без --yes)
   comfy --skip-prompt --no-enable-telemetry \
         --workspace="$COMFY_WORKSPACE" \
-        install --yes
+        install
 else
   echo "[wan_talk/setup] ComfyUI already present at ${COMFY_ROOT}; skipping install"
 fi
