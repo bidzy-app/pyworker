@@ -27,13 +27,10 @@ mkdir -p "$COMFY_WORKSPACE"
 if [ ! -d "$COMFY_ROOT" ]; then
   echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
 
-  # GPU выбор — по умолчанию nvidia
-  GPU_CHOICE="${WAN_GPU_CHOICE:-nvidia}"
-
   # Non-interactive установка comfy
   comfy --skip-prompt --no-enable-telemetry \
         --workspace="$COMFY_WORKSPACE" \
-        install --gpu "$GPU_CHOICE" --yes
+        install --yes
 else
   echo "[wan_talk/setup] ComfyUI already present at ${COMFY_ROOT}; skipping install"
 fi
