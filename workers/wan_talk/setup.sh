@@ -6,11 +6,24 @@ set -euo pipefail
 : "${COMFY_LAUNCH_EXTRAS:?COMFY_LAUNCH_EXTRAS must be set}"
 
 hash -r
-if ! command -v comfy >/dev/null 2>&1; then
-  echo "[wan_talk/setup] comfy-cli executable not found; install it via requirements before running setup." >&2
-  exit 1
+
+# --- Проверяем Python и pip ---
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "[wan_talk/setup] Installing python3"
+    apt-get update
+    apt-get install -y python3 python3-venv python3-pip
 fi
 
+if ! python3 -m pip >/dev/null 2>&1; then
+    echo "[wan_talk/setup] Installing pip for python3"
+    apt-get update
+    apt-get install -y python3-pip
+fi
+
+# Обновляем pip/setuptools/wheel
+python3 -m pip install --upgrade pip setuptools wheel
+
+# --- Устанавливаем aria2 ---
 if ! command -v aria2c >/dev/null 2>&1; then
   echo "[wan_talk/setup] installing apt packages: aria2"
   apt-get update
@@ -24,7 +37,17 @@ CUSTOM_NODE_DIR="$COMFY_ROOT/custom_nodes"
 echo "[wan_talk/setup] Preparing ComfyUI workspace at ${COMFY_WORKSPACE}"
 mkdir -p "$(dirname "$COMFY_WORKSPACE")"
 
-# Удаляем старый workspace, если он существует
+# --- Создаём виртуальное окружение ---
+ENV_PATH="${WORKSPACE_DIR:-/workspace}/worker-env"
+if [ ! -d "$ENV_PATH" ]; then
+    echo "[wan_talk/setup] Creating virtual environment at $ENV_PATH"
+    python3 -m venv "$ENV_PATH"
+fi
+
+source "$ENV_PATH/bin/activate"
+python -m pip install --upgrade pip setuptools wheel
+
+# --- Удаляем старый workspace ComfyUI, если он есть ---
 if [ -d "$COMFY_WORKSPACE" ]; then
     echo "[wan_talk/setup] Removing existing ComfyUI workspace at $COMFY_WORKSPACE"
     rm -rf "$COMFY_WORKSPACE"
@@ -50,7 +73,7 @@ comfy --skip-prompt --no-enable-telemetry \
       --workspace="$COMFY_WORKSPACE" \
       install $GPU_FLAG
 
-# Установка Python зависимостей
+# --- Установка Python зависимостей ---
 COMFY_REQUIREMENTS="$COMFY_ROOT/requirements.txt"
 if [ -f "$COMFY_REQUIREMENTS" ]; then
   echo "[wan_talk/setup] Installing ComfyUI Python dependencies"
@@ -63,7 +86,7 @@ if [ -f "$WAN_TALK_REQUIREMENTS" ]; then
   python -m pip install --no-cache-dir -r "$WAN_TALK_REQUIREMENTS"
 fi
 
-# Клонирование кастомных нод
+# --- Клонирование кастомных нод ---
 clone_node() {
   local repo_url="$1"
   local repo_name
@@ -95,7 +118,7 @@ for repo in "${CUSTOM_NODE_LIST[@]}"; do
   clone_node "$repo"
 done
 
-# Отключение трекинга и установка дефолтного workspace
+# --- Отключение трекинга и установка дефолтного workspace ---
 echo "[wan_talk/setup] Disabling comfy CLI tracking"
 comfy tracking disable || true
 
