@@ -29,22 +29,35 @@ if [ ! -d "$COMFY_ROOT" ]; then
   /usr/bin/expect <<'EXPECT'
 set timeout -1
 set workspace $env(COMFY_WORKSPACE)
-spawn comfy --workspace=$workspace install
+set install_cmd [format "comfy --workspace=%s install" $workspace]
+
+# запуск через script => CLI видит полноценный TTY, questionary не падает
+spawn script -qfc $install_cmd /dev/null
+
 expect {
     -re {Do you agree to enable tracking.*} {
-        send "n\r"
+        send -- "n\r"
         exp_continue
     }
-    -re {\? What GPU do you have.*} {
-        send "\r"
+    -re {\? What GPU .*} {
+        send -- "\r"
         exp_continue
     }
     -re {Install from .* \[y/N\]:} {
-        send "y\r"
+        send -- "y\r"
+        exp_continue
+    }
+    -re {Proceed with installation\? \[y/N\]:} {
+        send -- "y\r"
+        exp_continue
+    }
+    -re {\[y/N\]:} {
+        send -- "\r"
         exp_continue
     }
     eof
 }
+
 set wait_status [wait]
 set exit_status [lindex $wait_status 3]
 if {$exit_status != 0} {
