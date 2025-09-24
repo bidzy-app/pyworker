@@ -58,7 +58,7 @@ then
     fi
 
     # Fork testing
-    [[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/vast-ai/pyworker}" "$SERVER_DIR"
+    [[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/bidzy-app/pyworker}" "$SERVER_DIR"
     if [[ -n ${PYWORKER_REF:-} ]]; then
         (cd "$SERVER_DIR" && git checkout "$PYWORKER_REF")
     fi
