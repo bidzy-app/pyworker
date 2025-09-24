@@ -25,7 +25,7 @@ mkdir -p "$COMFY_WORKSPACE"
 
 if [ ! -d "$COMFY_ROOT" ]; then
   echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
-  comfy --workspace="$COMFY_WORKSPACE" install
+  printf 'n\n' | comfy --workspace="$COMFY_WORKSPACE" install
 else
   echo "[wan_talk/setup] ComfyUI already present at ${COMFY_ROOT}; skipping install"
 fi
