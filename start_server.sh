@@ -127,6 +127,7 @@ EOF
         POST "https://console.vast.ai/api/v0/sign_cert/?instance_id=$CONTAINER_ID" > /etc/instance.crt;
 fi
 
+UNSECURED=${UNSECURED:-true}
 export REPORT_ADDR WORKER_PORT USE_SSL UNSECURED
 
 cd "$SERVER_DIR"
