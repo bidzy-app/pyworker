@@ -132,10 +132,12 @@ async def handle_ping(_: web.Request) -> web.Response:
     return web.Response(body="pong")
 
 
+generate_route_handler = backend.create_handler(generate_handler)
+
 routes = [
     web.get("/ping", handle_ping),
-    web.post("/generate", backend.create_handler(generate_handler)),
-    web.post("/generate/", backend.create_handler(generate_handler)),
+    web.post("/generate", generate_route_handler),
+    web.post("/runsync", generate_route_handler),
 ]
 
 if __name__ == "__main__":

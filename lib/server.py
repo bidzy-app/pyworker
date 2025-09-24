@@ -25,7 +25,11 @@ def start_server(backend: Backend, routes: List[web.RouteDef], **kwargs):
 
     async def main():
         log.debug("starting server...")
-        app = web.Application()
+        app = web.Application(
+           middlewares=[
+                web.normalize_path_middleware(remove_slash=True, append_slash=False)
+           ]
+        )
         app.add_routes(routes)
         runner = web.AppRunner(app)
         await runner.setup()
