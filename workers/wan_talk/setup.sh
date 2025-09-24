@@ -41,21 +41,6 @@ clone_node() {
   git clone --depth 1 "$repo_url" "$clone_dir"
 }
 
-install_python_packages() {
-  # если PIP явно не задан, берём тот, что находится в PATH (для worker-env)
-  local PIP_BIN="${PIP:-$(command -v pip)}"
-  echo "[wan_talk] installing python dependencies with ${PIP_BIN}"
-
-  "$PIP_BIN" install --upgrade --no-cache-dir \
-    pillow \
-    scipy \
-    packaging librosa "numpy==1.26.4" moviepy \
-    color-matcher matplotlib huggingface_hub mss opencv-python ftfy \
-    "accelerate>=1.2.1" einops "diffusers>=0.33.0" "peft>=0.17.0" \
-    "sentencepiece>=0.2.0" protobuf pyloudnorm "gguf>=0.14.0" imageio-ffmpeg \
-    av comfy-cli sageattention
-}
-
 DIFFUSION_MODEL_1="${WAN_DIFFUSION_URL_1:-https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/InfiniteTalk/Wan2_1-InfiniTetalk-Single_fp16.safetensors?download=true}"
 DIFFUSION_MODEL_2="${WAN_DIFFUSION_URL_2:-https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B-480P_fp8_e4m3fn.safetensors}"
 VAE_MODEL_URL="${WAN_VAE_URL_1:-https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1_VAE_bf16.safetensors}"
@@ -89,5 +74,3 @@ mkdir -p "$CUSTOM_NODE_DIR"
 for repo in "${CUSTOM_NODE_LIST[@]}"; do
   clone_node "$repo"
 done
-
-install_python_packages
