@@ -5,7 +5,7 @@ import json
 import os
 import random
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -152,19 +152,14 @@ class WanTalkPayload(ApiPayload):
 
     @classmethod
     def from_json_msg(cls, json_msg: Dict[str, Any]) -> "WanTalkPayload":
-        required = ["positive_prompt", "negative_prompt"]
-        missing = {key: "missing parameter" for key in required if key not in json_msg}
-        if missing:
-            raise JsonDataException(missing)
+        field_names = {f.name for f in fields(cls)}
 
-        has_audio = any(
-            json_msg.get(field)
-            for field in ("audio_base64", "audio_url", "audio_path")
-        )
-        has_image = any(
-            json_msg.get(field)
-            for field in ("image_base64", "image_url", "image_path")
-        )
+        missing_required = {key: "missing parameter" for key in ("positive_prompt", "negative_prompt") if key not in json_msg}
+        if missing_required:
+            raise JsonDataException(missing_required)
+
+        has_audio = any(json_msg.get(name) for name in ("audio_base64", "audio_url", "audio_path"))
+        has_image = any(json_msg.get(name) for name in ("image_base64", "image_url", "image_path"))
 
         errors: Dict[str, Any] = {}
         if not has_audio:
@@ -174,8 +169,10 @@ class WanTalkPayload(ApiPayload):
         if errors:
             raise JsonDataException(errors)
 
-        return cls(**{k: v for k, v in json_msg.items() if hasattr(cls, k)})
-
+        # Отбрасываем только неизвестные поля, остальные передаём в конструктор
+        payload_kwargs = {k: v for k, v in json_msg.items() if k in field_names}
+        return cls(**payload_kwargs)
+    
     def _resolve_binary(
         self, *,
         base64_value: Optional[str],
