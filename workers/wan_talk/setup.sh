@@ -29,22 +29,28 @@ if [ ! -d "$COMFY_ROOT" ]; then
 
   /usr/bin/expect <<'EXPECT'
 set timeout -1
+
+# настройки окружения для комфортного вопросника
+set env(PROMPT_TOOLKIT_NO_CPR) 1
+set env(TERM) "xterm-256color"
+
 set workspace $env(COMFY_WORKSPACE)
-set install_cmd [format {comfy --workspace=%s install} $workspace]
+set gpu_choice [expr {[info exists env(WAN_GPU_CHOICE)] ? $env(WAN_GPU_CHOICE) : "nvidia"}]
+set asked_gpu 0
 
-spawn script -qfc $install_cmd /dev/null
-
+spawn comfy --workspace=$workspace install
 expect {
-    -re {\x1b\[6n} {
-        send -- "\u001b\[1;1R"
-        exp_continue
-    }
     -re {Do you agree to enable tracking.*} {
         send -- "n\r"
         exp_continue
     }
-    -re {\? What GPU .*} {
-        send -- "\r"
+    -re {\? What GPU do you have\?.*} {
+        if {!$asked_gpu} {
+            send -- "$gpu_choice\r"
+            set asked_gpu 1
+        } else {
+            send -- "\r"
+        }
         exp_continue
     }
     -re {Install from .* \[y/N\]:} {
@@ -58,6 +64,15 @@ expect {
     -re {\[y/N\]:} {
         send -- "\r"
         exp_continue
+    }
+    -re {\?\s*$} {
+        # Любые другие вопросы — жмём Enter, чтобы выбрать дефолт
+        send -- "\r"
+        exp_continue
+    }
+    timeout {
+        puts stderr "comfy install timed out waiting for input"
+        exit 1
     }
     eof
 }
