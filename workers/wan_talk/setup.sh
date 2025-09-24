@@ -10,10 +10,10 @@ if ! command -v comfy >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v aria2c >/dev/null 2>&1; then
-  echo "[wan_talk/setup] installing aria2"
+if ! command -v aria2c >/dev/null 2>&1 || ! command -v expect >/dev/null 2>&1; then
+  echo "[wan_talk/setup] installing apt packages: aria2 expect"
   apt-get update
-  apt-get install -y --no-install-recommends aria2
+  apt-get install -y --no-install-recommends aria2 expect
   apt-get clean
 fi
 
@@ -25,7 +25,29 @@ mkdir -p "$COMFY_WORKSPACE"
 
 if [ ! -d "$COMFY_ROOT" ]; then
   echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
-  printf 'n\n' | comfy --workspace="$COMFY_WORKSPACE" install
+
+  /usr/bin/expect <<'EXPECT'
+set timeout -1
+set workspace $env(COMFY_WORKSPACE)
+spawn comfy --workspace=$workspace install
+expect {
+    -re "Do you agree to enable tracking.*" {
+        send "n\r"
+        exp_continue
+    }
+    -re "\\(Use arrow keys\\)" {
+        send "\r"
+        exp_continue
+    }
+    eof
+}
+set wait_status [wait]
+set exit_status [lindex $wait_status 3]
+if {$exit_status != 0} {
+    exit $exit_status
+}
+EXPECT
+
 else
   echo "[wan_talk/setup] ComfyUI already present at ${COMFY_ROOT}; skipping install"
 fi
@@ -72,6 +94,9 @@ mkdir -p "$CUSTOM_NODE_DIR"
 for repo in "${CUSTOM_NODE_LIST[@]}"; do
   clone_node "$repo"
 done
+
+echo "[wan_talk/setup] Disabling comfy CLI tracking"
+comfy tracking disable || true
 
 echo "[wan_talk/setup] Setting comfy-cli default workspace"
 comfy set-default "$COMFY_WORKSPACE" --launch-extras="$COMFY_LAUNCH_EXTRAS"
