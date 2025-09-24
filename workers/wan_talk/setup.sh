@@ -36,7 +36,7 @@ spawn script -qfc $install_cmd /dev/null
 
 expect {
     -re {\x1b\[6n} {
-        send -- "\x1b[1;1R"
+        send -- "\u001b\[1;1R"
         exp_continue
     }
     -re {Do you agree to enable tracking.*} {
