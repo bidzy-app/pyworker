@@ -26,7 +26,7 @@ mkdir -p "$COMFY_WORKSPACE"
 if [ ! -d "$COMFY_ROOT" ]; then
   echo "[wan_talk/setup] Installing ComfyUI into ${COMFY_WORKSPACE}"
 
-  /usr/bin/expect <<'EXPECT'
+/usr/bin/expect <<'EXPECT'
 set timeout -1
 set workspace $env(COMFY_WORKSPACE)
 spawn comfy --workspace=$workspace install
@@ -35,8 +35,12 @@ expect {
         send "n\r"
         exp_continue
     }
-    -re "\\(Use arrow keys\\)" {
+    -re "\\? What GPU do you have.*" {
         send "\r"
+        exp_continue
+    }
+    -re "Install from .* \\[y/N\\]:" {
+        send "y\r"
         exp_continue
     }
     eof
