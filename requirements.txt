@@ -32,3 +32,4 @@ spandrel
 soundfile
 scipy
 Pillow
+aiohttp
