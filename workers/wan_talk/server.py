@@ -10,15 +10,18 @@ from lib.data_types import EndpointHandler
 from lib.server import start_server
 from .data_types import WanTalkPayload
 
-# Point to ComfyUI API Wrapper, not ComfyUI directly
+# CRITICAL: Point to API Wrapper, not ComfyUI directly
 MODEL_SERVER_URL = os.environ.get("MODEL_SERVER_URL", "http://127.0.0.1:8000")
 
-# API Wrapper logs
+# Wait for this message to indicate API Wrapper is ready
 MODEL_SERVER_START_LOG_MSG = "Application startup complete"
+
+# Error messages to watch for
 MODEL_SERVER_ERROR_LOG_MSGS = [
     "Failed to connect to ComfyUI",
     "Error processing request",
     "Workflow execution failed",
+    "Network error",
 ]
 
 logging.basicConfig(
@@ -37,19 +40,21 @@ async def _prepare_response(
     _ = request
     
     if model_response.status != 200:
-        log.debug("API Wrapper returned status %s", model_response.status)
-        text = await model_response.text()
-        return web.Response(status=model_response.status, text=text)
+        log.error(f"API Wrapper returned status {model_response.status}")
+        try:
+            text = await model_response.text()
+            log.error(f"Response body: {text[:500]}")
+        except:
+            pass
+        return web.Response(status=model_response.status)
 
     try:
         result = await model_response.json()
+        log.debug(f"API Wrapper result status: {result.get('status')}")
+        return web.json_response(data=result)
     except Exception as e:
         log.error(f"Failed to parse API Wrapper response: {e}")
         return web.Response(status=500, text="Invalid response from generation service")
-
-    # The API Wrapper returns a standardized result object
-    # We can pass it through or transform it
-    return web.json_response(data=result)
 
 
 @dataclass
@@ -57,7 +62,7 @@ class WanTalkHandler(EndpointHandler[WanTalkPayload]):
 
     @property
     def endpoint(self) -> str:
-        # Use the sync endpoint from the API Wrapper
+        # Use the sync endpoint from API Wrapper
         return "/generate/sync"
 
     @property
@@ -92,13 +97,14 @@ backend = Backend(
     log_actions=[
         (LogAction.ModelLoaded, MODEL_SERVER_START_LOG_MSG),
         (LogAction.Info, "Starting"),
+        (LogAction.Info, "Uvicorn running"),
         *[(LogAction.ModelError, msg) for msg in MODEL_SERVER_ERROR_LOG_MSGS],
     ],
 )
 
 
 async def handle_ping(_: web.Request) -> web.Response:
-    return web.Response(body="pong")
+    return web.Response(text="pong")
 
 
 # Define routes
@@ -108,4 +114,7 @@ routes = [
 ]
 
 if __name__ == "__main__":
+    log.info(f"Starting WanTalk PyWorker")
+    log.info(f"MODEL_SERVER_URL: {MODEL_SERVER_URL}")
+    log.info(f"MODEL_LOG: {os.environ.get('MODEL_LOG')}")
     start_server(backend, routes)
