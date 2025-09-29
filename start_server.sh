@@ -130,13 +130,186 @@ fi
 UNSECURED=${UNSECURED:-true}
 export REPORT_ADDR WORKER_PORT USE_SSL UNSECURED
 
+# Start ComfyUI and API Wrapper for wan_talk backend
+if [ "$BACKEND" = "wan_talk" ]; then
+    export COMFY_ROOT="$WORKSPACE_DIR/ComfyUI"
+    export API_WRAPPER_DIR="$WORKSPACE_DIR/comfyui-api-wrapper"
+    export MODEL_SERVER_URL="http://127.0.0.1:8000"
+    export COMFYUI_API_BASE="http://127.0.0.1:8188"
+    
+    # Create logs directory
+    mkdir -p "$WORKSPACE_DIR/logs"
+    COMFY_LOG="$WORKSPACE_DIR/logs/comfyui.log"
+    API_WRAPPER_LOG="$WORKSPACE_DIR/logs/api_wrapper.log"
+    
+    echo "Starting ComfyUI services for wan_talk backend..."
+    
+    # Start ComfyUI in background if not already running
+    if ! pgrep -f "python.*main.py.*--port 8188" > /dev/null; then
+        echo "Starting ComfyUI on port 8188..."
+        cd "$COMFY_ROOT"
+        
+        # Clear the model log before starting
+        : > "$MODEL_LOG"
+        
+        # Start ComfyUI with output to both MODEL_LOG and COMFY_LOG
+        nohup python main.py \
+            --listen 127.0.0.1 \
+            --port 8188 \
+            --output-directory "$COMFY_ROOT/output" \
+            --input-directory "$COMFY_ROOT/input" \
+            >> "$MODEL_LOG" 2>&1 &
+        
+        COMFY_PID=$!
+        echo "ComfyUI started with PID $COMFY_PID"
+        
+        # Wait for ComfyUI to be ready (check /system_stats endpoint)
+        echo "Waiting for ComfyUI to start (checking http://127.0.0.1:8188/system_stats)..."
+        COMFY_READY=false
+        for i in {1..120}; do
+            if curl -s -f http://127.0.0.1:8188/system_stats > /dev/null 2>&1; then
+                echo "✓ ComfyUI is ready! (attempt $i/120)"
+                COMFY_READY=true
+                break
+            fi
+            echo "  Waiting for ComfyUI... (attempt $i/120)"
+            sleep 2
+        done
+        
+        if [ "$COMFY_READY" = false ]; then
+            echo "ERROR: ComfyUI failed to start within 240 seconds"
+            echo "Last 50 lines of ComfyUI log:"
+            tail -n 50 "$MODEL_LOG"
+            exit 1
+        fi
+    else
+        echo "ComfyUI is already running"
+    fi
+    
+    # Start API Wrapper in background if not already running
+    if ! pgrep -f "uvicorn.*main:app.*--port 8000" > /dev/null; then
+        echo "Starting ComfyUI API Wrapper on port 8000..."
+        cd "$API_WRAPPER_DIR"
+        
+        # Set API Wrapper environment variables
+        export COMFYUI_API_BASE="http://127.0.0.1:8188"
+        export API_HOST="127.0.0.1"
+        export API_PORT="8000"
+        export API_WORKERS="1"
+        export PREPROCESS_WORKERS="${PREPROCESS_WORKERS:-3}"
+        export GENERATION_WORKERS="${GENERATION_WORKERS:-1}"
+        export POSTPROCESS_WORKERS="${POSTPROCESS_WORKERS:-3}"
+        export MAX_QUEUE_SIZE="${MAX_QUEUE_SIZE:-100}"
+        
+        # Use Redis cache if available, otherwise use memory
+        if command -v redis-cli > /dev/null 2>&1 && redis-cli ping > /dev/null 2>&1; then
+            export API_CACHE="redis"
+            export REDIS_HOST="${REDIS_HOST:-localhost}"
+            export REDIS_PORT="${REDIS_PORT:-6379}"
+            export REDIS_DB="${REDIS_DB:-0}"
+            echo "Using Redis cache"
+        else
+            export API_CACHE="memory"
+            echo "Using in-memory cache"
+        fi
+        
+        # Start API Wrapper
+        nohup uvicorn main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            --workers 1 \
+            >> "$API_WRAPPER_LOG" 2>&1 &
+        
+        WRAPPER_PID=$!
+        echo "API Wrapper started with PID $WRAPPER_PID"
+        
+        # Wait for API Wrapper to be ready (check /health endpoint)
+        echo "Waiting for API Wrapper to start (checking http://127.0.0.1:8000/health)..."
+        WRAPPER_READY=false
+        for i in {1..60}; do
+            if curl -s -f http://127.0.0.1:8000/health > /dev/null 2>&1; then
+                echo "✓ API Wrapper is ready! (attempt $i/60)"
+                WRAPPER_READY=true
+                break
+            fi
+            echo "  Waiting for API Wrapper... (attempt $i/60)"
+            sleep 2
+        done
+        
+        if [ "$WRAPPER_READY" = false ]; then
+            echo "ERROR: API Wrapper failed to start within 120 seconds"
+            echo "Last 50 lines of API Wrapper log:"
+            tail -n 50 "$API_WRAPPER_LOG"
+            exit 1
+        fi
+    else
+        echo "API Wrapper is already running"
+    fi
+    
+    # Verify both services are responding
+    echo "Verifying services..."
+    if ! curl -s -f http://127.0.0.1:8188/system_stats > /dev/null 2>&1; then
+        echo "ERROR: ComfyUI is not responding on http://127.0.0.1:8188"
+        exit 1
+    fi
+    
+    if ! curl -s -f http://127.0.0.1:8000/health > /dev/null 2>&1; then
+        echo "ERROR: API Wrapper is not responding on http://127.0.0.1:8000"
+        exit 1
+    fi
+    
+    echo "✓ All services are running and healthy"
+    echo "  - ComfyUI: http://127.0.0.1:8188"
+    echo "  - API Wrapper: http://127.0.0.1:8000"
+    echo "  - ComfyUI Log: $MODEL_LOG"
+    echo "  - API Wrapper Log: $API_WRAPPER_LOG"
+fi
+
 cd "$SERVER_DIR"
 
 echo "launching PyWorker server"
 
 # if instance is rebooted, we want to clear out the log file so pyworker doesn't read lines
 # from the run prior to reboot. past logs are saved in $MODEL_LOG.old for debugging only
-[ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
+if [ "$BACKEND" != "wan_talk" ]; then
+    # For non-wan_talk backends, clear the log as before
+    [ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
+fi
 
+# Start PyWorker server
 (python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
-echo "launching PyWorker server done"
+PYWORKER_PID=$!
+echo "PyWorker server started with PID $PYWORKER_PID"
+
+# Keep the script running and monitor processes
+echo "All services started successfully!"
+echo "Monitoring processes..."
+
+# Function to check if a process is running
+check_process() {
+    local pid=$1
+    local name=$2
+    if ! kill -0 $pid 2>/dev/null; then
+        echo "ERROR: $name (PID $pid) has stopped!"
+        return 1
+    fi
+    return 0
+}
+
+# Monitor loop
+while true; do
+    sleep 30
+    
+    if [ "$BACKEND" = "wan_talk" ]; then
+        # Check all services
+        if [ -n "${COMFY_PID:-}" ]; then
+            check_process $COMFY_PID "ComfyUI" || exit 1
+        fi
+        
+        if [ -n "${WRAPPER_PID:-}" ]; then
+            check_process $WRAPPER_PID "API Wrapper" || exit 1
+        fi
+    fi
+    
+    check_process $PYWORKER_PID "PyWorker" || exit 1
+done
