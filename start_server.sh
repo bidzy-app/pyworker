@@ -166,13 +166,13 @@ if [ "$BACKEND" = "wan_talk" ]; then
         # Wait for ComfyUI to be ready (check /system_stats endpoint)
         echo "Waiting for ComfyUI to start (checking http://127.0.0.1:8188/system_stats)..."
         COMFY_READY=false
-        for i in {1..120}; do
+        for i in {1..60}; do
             if curl -s -f http://127.0.0.1:8188/system_stats > /dev/null 2>&1; then
-                echo "✓ ComfyUI is ready! (attempt $i/120)"
+                echo "✓ ComfyUI is ready! (attempt $i/60)"
                 COMFY_READY=true
                 break
             fi
-            echo "  Waiting for ComfyUI... (attempt $i/120)"
+            echo "  Waiting for ComfyUI... (attempt $i/60)"
             sleep 2
         done
         
@@ -237,7 +237,7 @@ if [ "$BACKEND" = "wan_talk" ]; then
         done
         
         if [ "$WRAPPER_READY" = false ]; then
-            echo "ERROR: API Wrapper failed to start within 120 seconds"
+            echo "ERROR: API Wrapper failed to start within 60 seconds"
             echo "Last 50 lines of API Wrapper log:"
             tail -n 50 "$API_WRAPPER_LOG"
             exit 1

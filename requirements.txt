@@ -33,3 +33,4 @@ soundfile
 scipy
 Pillow
 aiohttp
+torchsde
