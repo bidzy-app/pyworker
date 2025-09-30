@@ -12,7 +12,6 @@ PYWORKER_LOG="$WORKSPACE_DIR/pyworker.log"
 REPORT_ADDR="${REPORT_ADDR:-https://cloud.vast.ai/api/v0,https://run.vast.ai}"
 USE_SSL="${USE_SSL:-true}"
 WORKER_PORT="${WORKER_PORT:-3000}"
-
 mkdir -p "$WORKSPACE_DIR"
 cd "$WORKSPACE_DIR"
 
@@ -21,10 +20,6 @@ exec &> >(tee -a "$DEBUG_LOG")
 
 function echo_var(){
     echo "$1: ${!1}"
-}
-
-function log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
 }
 
 [ -z "$BACKEND" ] && echo "BACKEND must be set!" && exit 1
@@ -85,42 +80,13 @@ fi
 if [ "$BACKEND" = "wan_talk" ]; then
     SETUP_SCRIPT="$SERVER_DIR/workers/wan_talk/setup.sh"
     if [ -x "$SETUP_SCRIPT" ]; then
-        log "Running wan_talk setup..."
+        echo "running wan_talk setup..."
         bash "$SETUP_SCRIPT"
-        log "wan_talk setup complete"
+        echo "wan_talk setup complete"
     else
-        log "ERROR: wan_talk setup script missing or not executable: $SETUP_SCRIPT"
+        echo "wan_talk setup script missing or not executable: $SETUP_SCRIPT"
         exit 1
     fi
-    
-    # Additional dependency verification for wan_talk
-    log "Verifying wan_talk dependencies..."
-    
-    # Ensure we're in the correct environment
-    if [ -d "/opt/micromamba/envs/comfyui" ]; then
-        source /opt/micromamba/envs/comfyui/bin/activate
-    fi
-    
-    # Critical: Check and fix NumPy before starting ComfyUI
-    NUMPY_VERSION=$(python -c "import numpy; print(numpy.__version__)" 2>/dev/null || echo "missing")
-    if [[ "$NUMPY_VERSION" == 2.* ]] || [[ "$NUMPY_VERSION" == "missing" ]]; then
-        log "WARNING: NumPy $NUMPY_VERSION detected - fixing compatibility..."
-        pip uninstall -y numpy
-        pip install "numpy>=1.25.0,<2.0"
-        pip uninstall -y opencv-python
-        pip install opencv-python
-        log "NumPy compatibility fixed"
-    fi
-    
-    # Verify critical dependencies are installed
-    log "Checking critical dependencies..."
-    if ! python -c "import cv2, diffusers, librosa, imageio_ffmpeg" 2>/dev/null; then
-        log "WARNING: Missing dependencies detected, installing..."
-        pip install opencv-python diffusers>=0.33.0 librosa imageio-ffmpeg
-        log "Dependencies installed"
-    fi
-    
-    log "Dependency verification complete"
 fi
 
 [ ! -d "$SERVER_DIR/workers/$BACKEND" ] && echo "$BACKEND not supported!" && exit 1
@@ -176,17 +142,11 @@ if [ "$BACKEND" = "wan_talk" ]; then
     COMFY_LOG="$WORKSPACE_DIR/logs/comfyui.log"
     API_WRAPPER_LOG="$WORKSPACE_DIR/logs/api_wrapper.log"
     
-    log "Starting ComfyUI services for wan_talk backend..."
-    
-    # Kill any existing processes on the ports
-    log "Checking for existing processes..."
-    lsof -ti:8188 | xargs kill -9 2>/dev/null || true
-    lsof -ti:8000 | xargs kill -9 2>/dev/null || true
-    sleep 2
+    echo "Starting ComfyUI services for wan_talk backend..."
     
     # Start ComfyUI in background if not already running
     if ! pgrep -f "python.*main.py.*--port 8188" > /dev/null; then
-        log "Starting ComfyUI on port 8188..."
+        echo "Starting ComfyUI on port 8188..."
         cd "$COMFY_ROOT"
         
         # Clear the model log before starting
@@ -201,14 +161,14 @@ if [ "$BACKEND" = "wan_talk" ]; then
             >> "$MODEL_LOG" 2>&1 &
         
         COMFY_PID=$!
-        log "ComfyUI started with PID $COMFY_PID"
+        echo "ComfyUI started with PID $COMFY_PID"
         
         # Wait for ComfyUI to be ready (check /system_stats endpoint)
-        log "Waiting for ComfyUI to start (checking http://127.0.0.1:8188/system_stats)..."
+        echo "Waiting for ComfyUI to start (checking http://127.0.0.1:8188/system_stats)..."
         COMFY_READY=false
         for i in {1..60}; do
             if curl -s -f http://127.0.0.1:8188/system_stats > /dev/null 2>&1; then
-                log "✓ ComfyUI is ready! (attempt $i/60)"
+                echo "✓ ComfyUI is ready! (attempt $i/60)"
                 COMFY_READY=true
                 break
             fi
@@ -217,18 +177,18 @@ if [ "$BACKEND" = "wan_talk" ]; then
         done
         
         if [ "$COMFY_READY" = false ]; then
-            log "ERROR: ComfyUI failed to start within 120 seconds"
-            log "Last 50 lines of ComfyUI log:"
+            echo "ERROR: ComfyUI failed to start within 240 seconds"
+            echo "Last 50 lines of ComfyUI log:"
             tail -n 50 "$MODEL_LOG"
             exit 1
         fi
     else
-        log "ComfyUI is already running"
+        echo "ComfyUI is already running"
     fi
     
     # Start API Wrapper in background if not already running
     if ! pgrep -f "uvicorn.*main:app.*--port 8000" > /dev/null; then
-        log "Starting ComfyUI API Wrapper on port 8000..."
+        echo "Starting ComfyUI API Wrapper on port 8000..."
         cd "$API_WRAPPER_DIR"
         
         # Set API Wrapper environment variables
@@ -247,10 +207,10 @@ if [ "$BACKEND" = "wan_talk" ]; then
             export REDIS_HOST="${REDIS_HOST:-localhost}"
             export REDIS_PORT="${REDIS_PORT:-6379}"
             export REDIS_DB="${REDIS_DB:-0}"
-            log "Using Redis cache"
+            echo "Using Redis cache"
         else
             export API_CACHE="memory"
-            log "Using in-memory cache"
+            echo "Using in-memory cache"
         fi
         
         # Start API Wrapper
@@ -261,14 +221,14 @@ if [ "$BACKEND" = "wan_talk" ]; then
             >> "$API_WRAPPER_LOG" 2>&1 &
         
         WRAPPER_PID=$!
-        log "API Wrapper started with PID $WRAPPER_PID"
+        echo "API Wrapper started with PID $WRAPPER_PID"
         
         # Wait for API Wrapper to be ready (check /health endpoint)
-        log "Waiting for API Wrapper to start (checking http://127.0.0.1:8000/health)..."
+        echo "Waiting for API Wrapper to start (checking http://127.0.0.1:8000/health)..."
         WRAPPER_READY=false
         for i in {1..60}; do
             if curl -s -f http://127.0.0.1:8000/health > /dev/null 2>&1; then
-                log "✓ API Wrapper is ready! (attempt $i/60)"
+                echo "✓ API Wrapper is ready! (attempt $i/60)"
                 WRAPPER_READY=true
                 break
             fi
@@ -277,37 +237,37 @@ if [ "$BACKEND" = "wan_talk" ]; then
         done
         
         if [ "$WRAPPER_READY" = false ]; then
-            log "ERROR: API Wrapper failed to start within 120 seconds"
-            log "Last 50 lines of API Wrapper log:"
+            echo "ERROR: API Wrapper failed to start within 60 seconds"
+            echo "Last 50 lines of API Wrapper log:"
             tail -n 50 "$API_WRAPPER_LOG"
             exit 1
         fi
     else
-        log "API Wrapper is already running"
+        echo "API Wrapper is already running"
     fi
     
     # Verify both services are responding
-    log "Verifying services..."
+    echo "Verifying services..."
     if ! curl -s -f http://127.0.0.1:8188/system_stats > /dev/null 2>&1; then
-        log "ERROR: ComfyUI is not responding on http://127.0.0.1:8188"
+        echo "ERROR: ComfyUI is not responding on http://127.0.0.1:8188"
         exit 1
     fi
     
     if ! curl -s -f http://127.0.0.1:8000/health > /dev/null 2>&1; then
-        log "ERROR: API Wrapper is not responding on http://127.0.0.1:8000"
+        echo "ERROR: API Wrapper is not responding on http://127.0.0.1:8000"
         exit 1
     fi
     
-    log "✓ All services are running and healthy"
-    log "  - ComfyUI: http://127.0.0.1:8188"
-    log "  - API Wrapper: http://127.0.0.1:8000"
-    log "  - ComfyUI Log: $MODEL_LOG"
-    log "  - API Wrapper Log: $API_WRAPPER_LOG"
+    echo "✓ All services are running and healthy"
+    echo "  - ComfyUI: http://127.0.0.1:8188"
+    echo "  - API Wrapper: http://127.0.0.1:8000"
+    echo "  - ComfyUI Log: $MODEL_LOG"
+    echo "  - API Wrapper Log: $API_WRAPPER_LOG"
 fi
 
 cd "$SERVER_DIR"
 
-log "Launching PyWorker server"
+echo "launching PyWorker server"
 
 # if instance is rebooted, we want to clear out the log file so pyworker doesn't read lines
 # from the run prior to reboot. past logs are saved in $MODEL_LOG.old for debugging only
@@ -319,18 +279,18 @@ fi
 # Start PyWorker server
 (python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
 PYWORKER_PID=$!
-log "PyWorker server started with PID $PYWORKER_PID"
+echo "PyWorker server started with PID $PYWORKER_PID"
 
 # Keep the script running and monitor processes
-log "All services started successfully!"
-log "Monitoring processes..."
+echo "All services started successfully!"
+echo "Monitoring processes..."
 
 # Function to check if a process is running
 check_process() {
     local pid=$1
     local name=$2
     if ! kill -0 $pid 2>/dev/null; then
-        log "ERROR: $name (PID $pid) has stopped!"
+        echo "ERROR: $name (PID $pid) has stopped!"
         return 1
     fi
     return 0
