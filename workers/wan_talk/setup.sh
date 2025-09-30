@@ -21,31 +21,66 @@ apt-get install -y --no-install-recommends \
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 COMFY_ROOT="$WORKSPACE_DIR/ComfyUI"
 API_WRAPPER_DIR="$WORKSPACE_DIR/comfyui-api-wrapper"
+ENV_PATH="$WORKSPACE_DIR/worker-env"
 
-# Ensure we're using the PyWorker venv
-if [ -z "${VIRTUAL_ENV:-}" ]; then
-    echo "[wan_talk] Activating virtual environment..."
-    source "$WORKSPACE_DIR/worker-env/bin/activate"
+# ========================================
+# КРИТИЧНО: Используем ЯВНЫЕ пути к venv
+# ========================================
+if [ ! -d "$ENV_PATH" ]; then
+    echo "[wan_talk] ERROR: Virtual environment not found at $ENV_PATH"
+    exit 1
 fi
 
-echo "[wan_talk] Using Python: $(which python3)"
-echo "[wan_talk] Using venv: $VIRTUAL_ENV"
+# Явные пути к исполняемым файлам venv
+VENV_PYTHON="$ENV_PATH/bin/python3"
+VENV_PIP="$ENV_PATH/bin/pip"
+
+# Проверка существования
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "[wan_talk] ERROR: Python not found in venv: $VENV_PYTHON"
+    exit 1
+fi
+
+if [ ! -f "$VENV_PIP" ]; then
+    echo "[wan_talk] ERROR: Pip not found in venv: $VENV_PIP"
+    exit 1
+fi
+
+# Диагностика
+echo "=========================================="
+echo "[wan_talk] Virtual environment info:"
+echo "  ENV_PATH: $ENV_PATH"
+echo "  VENV_PYTHON: $VENV_PYTHON"
+echo "  VENV_PIP: $VENV_PIP"
+echo "=========================================="
+
+"$VENV_PYTHON" --version
+"$VENV_PIP" --version
+
+echo "[wan_talk] Python sys.path:"
+"$VENV_PYTHON" -c "import sys; print('\n'.join(sys.path))"
 
 # Install/upgrade PyTorch with CUDA support
 echo "[wan_talk] Installing PyTorch and dependencies..."
-pip install --upgrade pip wheel setuptools
+"$VENV_PIP" install --upgrade pip wheel setuptools
 
 # Install PyTorch first
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+echo "[wan_talk] Installing PyTorch with CUDA 12.8..."
+"$VENV_PIP" install --no-cache-dir \
+    torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu128
 
 # Install opencv and other critical dependencies
-pip install opencv-python opencv-python-headless
+echo "[wan_talk] Installing OpenCV..."
+"$VENV_PIP" install --no-cache-dir opencv-python opencv-python-headless
 
 # Verify PyTorch
-python3 -c "import torch; print(f'✓ PyTorch {torch.__version__}')"
-python3 -c "import torch; print(f'✓ CUDA available: {torch.cuda.is_available()}')"
-python3 -c "import torchvision; print(f'✓ torchvision {torchvision.__version__}')"
-python3 -c "import cv2; print(f'✓ OpenCV {cv2.__version__}')"
+echo "[wan_talk] Verifying PyTorch installation..."
+"$VENV_PYTHON" -c "import torch; print(f'✓ PyTorch {torch.__version__}')"
+"$VENV_PYTHON" -c "import torch; print(f'✓ PyTorch location: {torch.__file__}')"
+"$VENV_PYTHON" -c "import torch; print(f'✓ CUDA available: {torch.cuda.is_available()}')"
+"$VENV_PYTHON" -c "import torchvision; print(f'✓ torchvision {torchvision.__version__}')"
+"$VENV_PYTHON" -c "import cv2; print(f'✓ OpenCV {cv2.__version__}')"
 
 # Install ComfyUI if not present
 if [[ ! -d "$COMFY_ROOT" ]]; then
@@ -53,14 +88,14 @@ if [[ ! -d "$COMFY_ROOT" ]]; then
     cd "$WORKSPACE_DIR"
     git clone https://github.com/comfyanonymous/ComfyUI.git "$COMFY_ROOT"
     cd "$COMFY_ROOT"
-    pip install -r requirements.txt
-    pip install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
+    "$VENV_PIP" install -r requirements.txt
+    "$VENV_PIP" install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
     echo "[wan_talk] ComfyUI installed"
 else
     echo "[wan_talk] ComfyUI already installed"
     cd "$COMFY_ROOT"
-    pip install -r requirements.txt || echo "Warning: Some requirements failed"
-    pip install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
+    "$VENV_PIP" install -r requirements.txt || echo "Warning: Some requirements failed"
+    "$VENV_PIP" install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
 fi
 
 # Install ComfyUI API Wrapper
@@ -69,12 +104,12 @@ if [[ ! -d "$API_WRAPPER_DIR" ]]; then
     cd "$WORKSPACE_DIR"
     git clone https://github.com/ai-dock/comfyui-api-wrapper.git "$API_WRAPPER_DIR"
     cd "$API_WRAPPER_DIR"
-    pip install -r requirements.txt
+    "$VENV_PIP" install -r requirements.txt
     echo "[wan_talk] API Wrapper installed"
 else
     echo "[wan_talk] API Wrapper already installed"
     cd "$API_WRAPPER_DIR"
-    pip install -r requirements.txt || echo "Warning: Some requirements failed"
+    "$VENV_PIP" install -r requirements.txt || echo "Warning: Some requirements failed"
 fi
 
 # Install custom nodes with dependencies
@@ -99,29 +134,29 @@ install_custom_node() {
     # Install requirements
     if [[ -f "$clone_dir/requirements.txt" ]]; then
         echo "[wan_talk] Installing requirements for $node_name..."
-        pip install -r "$clone_dir/requirements.txt" || echo "Warning: Some dependencies failed for $node_name"
+        "$VENV_PIP" install -r "$clone_dir/requirements.txt" || echo "Warning: Some dependencies failed for $node_name"
     fi
     
     # Run install script if exists
     if [[ -f "$clone_dir/install.py" ]]; then
         echo "[wan_talk] Running install.py for $node_name..."
         cd "$clone_dir"
-        python3 install.py || echo "Warning: install.py failed for $node_name"
+        "$VENV_PYTHON" install.py || echo "Warning: install.py failed for $node_name"
     fi
     
     # Special handling for specific nodes
     case "$node_name" in
         "ComfyUI-VideoHelperSuite")
-            pip install imageio imageio-ffmpeg || echo "Warning: imageio install failed"
+            "$VENV_PIP" install imageio imageio-ffmpeg || echo "Warning: imageio install failed"
             ;;
         "ComfyUI-KJNodes")
-            pip install numba || echo "Warning: numba install failed"
+            "$VENV_PIP" install numba || echo "Warning: numba install failed"
             ;;
         "ComfyUI-WanVideoWrapper")
-            pip install huggingface_hub diffusers || echo "Warning: WanVideo deps failed"
+            "$VENV_PIP" install huggingface_hub diffusers || echo "Warning: WanVideo deps failed"
             ;;
         "audio-separation-nodes-comfyui")
-            pip install librosa soundfile || echo "Warning: audio deps failed"
+            "$VENV_PIP" install librosa soundfile || echo "Warning: audio deps failed"
             ;;
     esac
 }
@@ -154,8 +189,14 @@ chmod -R 755 "$COMFY_ROOT"
 
 # Verify installation
 echo "[wan_talk] Verifying installation..."
-python3 << 'PYTHON'
+"$VENV_PYTHON" << 'PYTHON'
 import sys
+import os
+
+print(f"Python executable: {sys.executable}")
+print(f"Python version: {sys.version}")
+print(f"Site packages: {[p for p in sys.path if 'site-packages' in p]}")
+
 required_packages = [
     'torch', 'torchvision', 'torchaudio', 
     'PIL', 'numpy', 'cv2', 'aiohttp',
@@ -164,17 +205,34 @@ required_packages = [
 missing = []
 for pkg in required_packages:
     try:
-        __import__(pkg)
-        print(f"✓ {pkg}")
-    except ImportError:
-        print(f"✗ {pkg} - MISSING")
+        mod = __import__(pkg)
+        location = getattr(mod, '__file__', 'built-in')
+        print(f"✓ {pkg:20s} ({location})")
+    except ImportError as e:
+        print(f"✗ {pkg:20s} - MISSING ({e})")
         missing.append(pkg)
 
 if missing:
     print(f"\nERROR: Missing packages: {', '.join(missing)}")
     sys.exit(1)
 else:
-    print("\n✓ All required packages installed")
+    print("\n✓ All required packages installed successfully!")
+    print(f"✓ All packages are in venv: {sys.prefix}")
 PYTHON
 
+# Финальная проверка torch
+echo "[wan_talk] Final torch verification..."
+if ! "$VENV_PYTHON" -c "import torch; print(f'Torch OK: {torch.__version__}')" 2>&1; then
+    echo "[wan_talk] ERROR: Final torch verification failed!"
+    echo "[wan_talk] Installed packages:"
+    "$VENV_PIP" list | grep -i torch
+    exit 1
+fi
+
+echo "=========================================="
 echo "[wan_talk] Setup complete!"
+echo "  Python: $VENV_PYTHON"
+echo "  Pip: $VENV_PIP"
+echo "  ComfyUI: $COMFY_ROOT"
+echo "  API Wrapper: $API_WRAPPER_DIR"
+echo "=========================================="
