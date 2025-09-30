@@ -23,9 +23,6 @@ COMFY_ROOT="$WORKSPACE_DIR/ComfyUI"
 API_WRAPPER_DIR="$WORKSPACE_DIR/comfyui-api-wrapper"
 ENV_PATH="${ENV_PATH:-$WORKSPACE_DIR/worker-env}"
 
-# ========================================
-# Use python -m pip instead of pip binary
-# ========================================
 if [ ! -d "$ENV_PATH" ]; then
     echo "[wan_talk] ERROR: Virtual environment not found at $ENV_PATH"
     exit 1
@@ -52,30 +49,20 @@ echo "=========================================="
 "$VENV_PYTHON" --version
 venv_pip --version
 
-echo "[wan_talk] Python sys.path:"
-"$VENV_PYTHON" -c "import sys; print('\n'.join(sys.path))"
-
 # Install/upgrade PyTorch with CUDA support
 echo "[wan_talk] Installing PyTorch and dependencies..."
 venv_pip install --upgrade pip wheel setuptools
 
-# Install PyTorch first
 echo "[wan_talk] Installing PyTorch with CUDA 12.8..."
 venv_pip install --no-cache-dir \
     torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu128
 
-# Install opencv and other critical dependencies
-echo "[wan_talk] Installing OpenCV..."
 venv_pip install --no-cache-dir opencv-python opencv-python-headless
 
 # Verify PyTorch
-echo "[wan_talk] Verifying PyTorch installation..."
 "$VENV_PYTHON" -c "import torch; print(f'✓ PyTorch {torch.__version__}')"
-"$VENV_PYTHON" -c "import torch; print(f'✓ PyTorch location: {torch.__file__}')"
 "$VENV_PYTHON" -c "import torch; print(f'✓ CUDA available: {torch.cuda.is_available()}')"
-"$VENV_PYTHON" -c "import torchvision; print(f'✓ torchvision {torchvision.__version__}')"
-"$VENV_PYTHON" -c "import cv2; print(f'✓ OpenCV {cv2.__version__}')"
 
 # Install ComfyUI if not present
 if [[ ! -d "$COMFY_ROOT" ]]; then
@@ -90,8 +77,33 @@ else
     echo "[wan_talk] ComfyUI already installed"
     cd "$COMFY_ROOT"
     venv_pip install -r requirements.txt || echo "Warning: Some requirements failed"
-    venv_pip install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
 fi
+
+# ✅ Install ComfyUI-Manager (instead of manual nodes)
+CUSTOM_NODE_DIR="$COMFY_ROOT/custom_nodes"
+mkdir -p "$CUSTOM_NODE_DIR"
+if [[ ! -d "$CUSTOM_NODE_DIR/ComfyUI-Manager" ]]; then
+    echo "[wan_talk] Installing ComfyUI-Manager..."
+    cd "$CUSTOM_NODE_DIR"
+    git clone https://github.com/ltdrdata/ComfyUI-Manager
+else
+    echo "[wan_talk] ComfyUI-Manager already installed"
+    cd "$CUSTOM_NODE_DIR/ComfyUI-Manager"
+    git pull || echo "Warning: failed to update ComfyUI-Manager"
+fi
+
+cat > "$COMFY_ROOT/custom_nodes/install.json" << 'JSON'
+{
+  "repos": [
+    "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+    "https://github.com/kijai/ComfyUI-KJNodes.git",
+    "https://github.com/kijai/ComfyUI-WanVideoWrapper",
+    "https://github.com/christian-byrne/audio-separation-nodes-comfyui"
+  ]
+}
+JSON
+
+echo "[wan_talk] install.json создан для ComfyUI-Manager"
 
 # Install ComfyUI API Wrapper
 if [[ ! -d "$API_WRAPPER_DIR" ]]; then
@@ -106,67 +118,6 @@ else
     cd "$API_WRAPPER_DIR"
     venv_pip install -r requirements.txt || echo "Warning: Some requirements failed"
 fi
-
-# Install custom nodes with dependencies
-CUSTOM_NODE_DIR="$COMFY_ROOT/custom_nodes"
-mkdir -p "$CUSTOM_NODE_DIR"
-
-install_custom_node() {
-    local repo_url="$1"
-    local node_name="$(basename "$repo_url" .git)"
-    local clone_dir="$CUSTOM_NODE_DIR/$node_name"
-    
-    if [[ -d "$clone_dir" ]]; then
-        echo "[wan_talk] Node exists: $node_name - updating dependencies"
-    else
-        echo "[wan_talk] Cloning $node_name..."
-        git clone --depth 1 "$repo_url" "$clone_dir" || {
-            echo "Warning: Failed to clone $node_name"
-            return 1
-        }
-    fi
-    
-    # Install requirements
-    if [[ -f "$clone_dir/requirements.txt" ]]; then
-        echo "[wan_talk] Installing requirements for $node_name..."
-        venv_pip install -r "$clone_dir/requirements.txt" || echo "Warning: Some dependencies failed for $node_name"
-    fi
-    
-    # Run install script if exists
-    if [[ -f "$clone_dir/install.py" ]]; then
-        echo "[wan_talk] Running install.py for $node_name..."
-        cd "$clone_dir"
-        "$VENV_PYTHON" install.py || echo "Warning: install.py failed for $node_name"
-    fi
-    
-    # Special handling for specific nodes
-    case "$node_name" in
-        "ComfyUI-VideoHelperSuite")
-            venv_pip install imageio imageio-ffmpeg || echo "Warning: imageio install failed"
-            ;;
-        "ComfyUI-KJNodes")
-            venv_pip install numba || echo "Warning: numba install failed"
-            ;;
-        "ComfyUI-WanVideoWrapper")
-            venv_pip install huggingface_hub diffusers || echo "Warning: WanVideo deps failed"
-            ;;
-        "audio-separation-nodes-comfyui")
-            venv_pip install librosa soundfile || echo "Warning: audio deps failed"
-            ;;
-    esac
-}
-
-echo "[wan_talk] Installing custom nodes..."
-REQUIRED_NODES=(
-    "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
-    "https://github.com/kijai/ComfyUI-KJNodes.git"
-    "https://github.com/kijai/ComfyUI-WanVideoWrapper"
-    "https://github.com/christian-byrne/audio-separation-nodes-comfyui"
-)
-
-for repo in "${REQUIRED_NODES[@]}"; do
-    install_custom_node "$repo"
-done
 
 # Create directories
 echo "[wan_talk] Creating directories..."
@@ -186,47 +137,32 @@ chmod -R 755 "$COMFY_ROOT"
 echo "[wan_talk] Verifying installation..."
 "$VENV_PYTHON" << 'PYTHON'
 import sys
-import os
-
 print(f"Python executable: {sys.executable}")
 print(f"Python version: {sys.version}")
-print(f"Site packages: {[p for p in sys.path if 'site-packages' in p]}")
-
 required_packages = [
-    'torch', 'torchvision', 'torchaudio', 
+    'torch', 'torchvision', 'torchaudio',
     'PIL', 'numpy', 'cv2', 'aiohttp',
     'transformers', 'safetensors', 'soundfile'
 ]
 missing = []
 for pkg in required_packages:
     try:
-        mod = __import__(pkg)
-        location = getattr(mod, '__file__', 'built-in')
-        print(f"✓ {pkg:20s} ({location})")
-    except ImportError as e:
-        print(f"✗ {pkg:20s} - MISSING ({e})")
+        __import__(pkg)
+        print(f"✓ {pkg}")
+    except ImportError:
+        print(f"✗ {pkg} - MISSING")
         missing.append(pkg)
-
 if missing:
     print(f"\nERROR: Missing packages: {', '.join(missing)}")
     sys.exit(1)
 else:
     print("\n✓ All required packages installed successfully!")
-    print(f"✓ All packages are in venv: {sys.prefix}")
 PYTHON
-
-# Финальная проверка torch
-echo "[wan_talk] Final torch verification..."
-if ! "$VENV_PYTHON" -c "import torch; print(f'Torch OK: {torch.__version__}')" 2>&1; then
-    echo "[wan_talk] ERROR: Final torch verification failed!"
-    echo "[wan_talk] Installed packages:"
-    venv_pip list | grep -i torch
-    exit 1
-fi
 
 echo "=========================================="
 echo "[wan_talk] Setup complete!"
 echo "  Python: $VENV_PYTHON"
 echo "  ComfyUI: $COMFY_ROOT"
+echo "  ComfyUI-Manager: $CUSTOM_NODE_DIR/ComfyUI-Manager"
 echo "  API Wrapper: $API_WRAPPER_DIR"
 echo "=========================================="
