@@ -9,7 +9,6 @@ gguf>=0.14.0
 hf_transfer>=0.1.9
 huggingface_hub
 imageio-ffmpeg
-lib~=4.0
 librosa
 matplotlib
 moviepy
@@ -22,7 +21,6 @@ protobuf
 pycryptodome~=3.20
 Requests~=2.32
 sageattention
-utils==1.0.*
 torch>=2.0.0
 torchvision>=0.15.0
 torchaudio>=2.0.0
