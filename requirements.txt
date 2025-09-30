@@ -1,4 +1,5 @@
-comfyui-frontend-package==1.14.5
+comfyui-frontend-package==1.26.13
+
 anyio~=4.4
 color-matcher
 comfy-cli
@@ -42,4 +43,7 @@ yarl>=1.18.0
 pyyaml
 tqdm
 psutil
+alembic
+SQLAlchemy
+av>=14.2.0
 opencv-python
