@@ -21,58 +21,53 @@ apt-get install -y --no-install-recommends \
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 COMFY_ROOT="$WORKSPACE_DIR/ComfyUI"
 API_WRAPPER_DIR="$WORKSPACE_DIR/comfyui-api-wrapper"
-ENV_PATH="$WORKSPACE_DIR/worker-env"
+ENV_PATH="${ENV_PATH:-$WORKSPACE_DIR/worker-env}"
 
 # ========================================
-# КРИТИЧНО: Используем ЯВНЫЕ пути к venv
+# Use python -m pip instead of pip binary
 # ========================================
 if [ ! -d "$ENV_PATH" ]; then
     echo "[wan_talk] ERROR: Virtual environment not found at $ENV_PATH"
     exit 1
 fi
 
-# Явные пути к исполняемым файлам venv
 VENV_PYTHON="$ENV_PATH/bin/python3"
-VENV_PIP="$ENV_PATH/bin/pip"
 
-# Проверка существования
 if [ ! -f "$VENV_PYTHON" ]; then
     echo "[wan_talk] ERROR: Python not found in venv: $VENV_PYTHON"
     exit 1
 fi
 
-if [ ! -f "$VENV_PIP" ]; then
-    echo "[wan_talk] ERROR: Pip not found in venv: $VENV_PIP"
-    exit 1
-fi
+# Function to use pip via python -m pip
+venv_pip() {
+    "$VENV_PYTHON" -m pip "$@"
+}
 
-# Диагностика
 echo "=========================================="
 echo "[wan_talk] Virtual environment info:"
 echo "  ENV_PATH: $ENV_PATH"
 echo "  VENV_PYTHON: $VENV_PYTHON"
-echo "  VENV_PIP: $VENV_PIP"
 echo "=========================================="
 
 "$VENV_PYTHON" --version
-"$VENV_PIP" --version
+venv_pip --version
 
 echo "[wan_talk] Python sys.path:"
 "$VENV_PYTHON" -c "import sys; print('\n'.join(sys.path))"
 
 # Install/upgrade PyTorch with CUDA support
 echo "[wan_talk] Installing PyTorch and dependencies..."
-"$VENV_PIP" install --upgrade pip wheel setuptools
+venv_pip install --upgrade pip wheel setuptools
 
 # Install PyTorch first
 echo "[wan_talk] Installing PyTorch with CUDA 12.8..."
-"$VENV_PIP" install --no-cache-dir \
+venv_pip install --no-cache-dir \
     torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu128
 
 # Install opencv and other critical dependencies
 echo "[wan_talk] Installing OpenCV..."
-"$VENV_PIP" install --no-cache-dir opencv-python opencv-python-headless
+venv_pip install --no-cache-dir opencv-python opencv-python-headless
 
 # Verify PyTorch
 echo "[wan_talk] Verifying PyTorch installation..."
@@ -88,14 +83,14 @@ if [[ ! -d "$COMFY_ROOT" ]]; then
     cd "$WORKSPACE_DIR"
     git clone https://github.com/comfyanonymous/ComfyUI.git "$COMFY_ROOT"
     cd "$COMFY_ROOT"
-    "$VENV_PIP" install -r requirements.txt
-    "$VENV_PIP" install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
+    venv_pip install -r requirements.txt
+    venv_pip install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
     echo "[wan_talk] ComfyUI installed"
 else
     echo "[wan_talk] ComfyUI already installed"
     cd "$COMFY_ROOT"
-    "$VENV_PIP" install -r requirements.txt || echo "Warning: Some requirements failed"
-    "$VENV_PIP" install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
+    venv_pip install -r requirements.txt || echo "Warning: Some requirements failed"
+    venv_pip install torchsde einops transformers safetensors aiohttp kornia spandrel soundfile scipy
 fi
 
 # Install ComfyUI API Wrapper
@@ -104,12 +99,12 @@ if [[ ! -d "$API_WRAPPER_DIR" ]]; then
     cd "$WORKSPACE_DIR"
     git clone https://github.com/ai-dock/comfyui-api-wrapper.git "$API_WRAPPER_DIR"
     cd "$API_WRAPPER_DIR"
-    "$VENV_PIP" install -r requirements.txt
+    venv_pip install -r requirements.txt
     echo "[wan_talk] API Wrapper installed"
 else
     echo "[wan_talk] API Wrapper already installed"
     cd "$API_WRAPPER_DIR"
-    "$VENV_PIP" install -r requirements.txt || echo "Warning: Some requirements failed"
+    venv_pip install -r requirements.txt || echo "Warning: Some requirements failed"
 fi
 
 # Install custom nodes with dependencies
@@ -134,7 +129,7 @@ install_custom_node() {
     # Install requirements
     if [[ -f "$clone_dir/requirements.txt" ]]; then
         echo "[wan_talk] Installing requirements for $node_name..."
-        "$VENV_PIP" install -r "$clone_dir/requirements.txt" || echo "Warning: Some dependencies failed for $node_name"
+        venv_pip install -r "$clone_dir/requirements.txt" || echo "Warning: Some dependencies failed for $node_name"
     fi
     
     # Run install script if exists
@@ -147,16 +142,16 @@ install_custom_node() {
     # Special handling for specific nodes
     case "$node_name" in
         "ComfyUI-VideoHelperSuite")
-            "$VENV_PIP" install imageio imageio-ffmpeg || echo "Warning: imageio install failed"
+            venv_pip install imageio imageio-ffmpeg || echo "Warning: imageio install failed"
             ;;
         "ComfyUI-KJNodes")
-            "$VENV_PIP" install numba || echo "Warning: numba install failed"
+            venv_pip install numba || echo "Warning: numba install failed"
             ;;
         "ComfyUI-WanVideoWrapper")
-            "$VENV_PIP" install huggingface_hub diffusers || echo "Warning: WanVideo deps failed"
+            venv_pip install huggingface_hub diffusers || echo "Warning: WanVideo deps failed"
             ;;
         "audio-separation-nodes-comfyui")
-            "$VENV_PIP" install librosa soundfile || echo "Warning: audio deps failed"
+            venv_pip install librosa soundfile || echo "Warning: audio deps failed"
             ;;
     esac
 }
@@ -225,14 +220,13 @@ echo "[wan_talk] Final torch verification..."
 if ! "$VENV_PYTHON" -c "import torch; print(f'Torch OK: {torch.__version__}')" 2>&1; then
     echo "[wan_talk] ERROR: Final torch verification failed!"
     echo "[wan_talk] Installed packages:"
-    "$VENV_PIP" list | grep -i torch
+    venv_pip list | grep -i torch
     exit 1
 fi
 
 echo "=========================================="
 echo "[wan_talk] Setup complete!"
 echo "  Python: $VENV_PYTHON"
-echo "  Pip: $VENV_PIP"
 echo "  ComfyUI: $COMFY_ROOT"
 echo "  API Wrapper: $API_WRAPPER_DIR"
 echo "=========================================="

@@ -68,6 +68,13 @@ then
     
     # Verify venv is activated
     echo "Python path: $(which python3)"
+    
+    # Install pip into venv if not present
+    if [ ! -f "$ENV_PATH/bin/pip" ]; then
+        echo "Installing pip into venv..."
+        "$ENV_PATH/bin/python3" -m ensurepip --upgrade
+    fi
+    
     echo "Pip path: $(which pip)"
 
     uv pip install -r "${SERVER_DIR}/requirements.txt"
@@ -83,13 +90,9 @@ fi
 
 # Backend-specific bootstrap (models, custom nodes, etc.)
 if [ "$BACKEND" = "wan_talk" ]; then
-    # Ensure venv is activated for setup script
-    export VIRTUAL_ENV="$ENV_PATH"
-    export PATH="$ENV_PATH/bin:$PATH"
-    
-    # Pass venv paths to setup script
-    export VENV_PYTHON="$ENV_PATH/bin/python3"
-    export VENV_PIP="$ENV_PATH/bin/pip"
+    # Export paths for setup script
+    export WORKSPACE_DIR="$WORKSPACE_DIR"
+    export ENV_PATH="$ENV_PATH"
     
     SETUP_SCRIPT="$SERVER_DIR/workers/wan_talk/setup.sh"
     if [ -x "$SETUP_SCRIPT" ]; then
@@ -99,7 +102,7 @@ if [ "$BACKEND" = "wan_talk" ]; then
         
         # Verify torch installation in venv
         echo "Verifying torch installation..."
-        if ! "$VENV_PYTHON" -c "import torch; print(f'Torch version: {torch.__version__}')" 2>/dev/null; then
+        if ! "$ENV_PATH/bin/python3" -c "import torch; print(f'Torch version: {torch.__version__}')" 2>/dev/null; then
             echo "ERROR: torch not found in venv after setup"
             exit 1
         fi
@@ -174,7 +177,7 @@ if [ "$BACKEND" = "wan_talk" ]; then
         : > "$MODEL_LOG"
         
         # Use python from venv
-        nohup "$VENV_PYTHON" main.py \
+        nohup "$ENV_PATH/bin/python3" main.py \
             --listen 127.0.0.1 \
             --port 8188 \
             --output-directory "$COMFY_ROOT/output" \
@@ -235,7 +238,7 @@ if [ "$BACKEND" = "wan_talk" ]; then
         fi
         
         # Use python from venv
-        nohup "$VENV_PYTHON" -m uvicorn main:app \
+        nohup "$ENV_PATH/bin/python3" -m uvicorn main:app \
             --host 127.0.0.1 \
             --port 8000 \
             --workers 1 \
@@ -298,7 +301,7 @@ if [ "$BACKEND" != "wan_talk" ]; then
 fi
 
 # Start PyWorker server using python from venv
-("$VENV_PYTHON" -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
+("$ENV_PATH/bin/python3" -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
 PYWORKER_PID=$!
 echo "PyWorker server started with PID $PYWORKER_PID"
 
