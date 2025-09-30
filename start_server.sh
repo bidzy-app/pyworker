@@ -65,24 +65,45 @@ then
 
     uv venv --python-preference only-managed "$ENV_PATH" -p 3.10
     source "$ENV_PATH/bin/activate"
+    
+    # Verify venv is activated
+    echo "Python path: $(which python3)"
+    echo "Pip path: $(which pip)"
 
     uv pip install -r "${SERVER_DIR}/requirements.txt"
 
     touch ~/.no_auto_tmux
 else
     [[ -f ~/.local/bin/env ]] && source ~/.local/bin/env
-    source "$WORKSPACE_DIR/worker-env/bin/activate"
+    source "$ENV_PATH/bin/activate"
     echo "environment activated"
     echo "venv: $VIRTUAL_ENV"
+    echo "Python path: $(which python3)"
 fi
 
 # Backend-specific bootstrap (models, custom nodes, etc.)
 if [ "$BACKEND" = "wan_talk" ]; then
+    # Ensure venv is activated for setup script
+    export VIRTUAL_ENV="$ENV_PATH"
+    export PATH="$ENV_PATH/bin:$PATH"
+    
+    # Pass venv paths to setup script
+    export VENV_PYTHON="$ENV_PATH/bin/python3"
+    export VENV_PIP="$ENV_PATH/bin/pip"
+    
     SETUP_SCRIPT="$SERVER_DIR/workers/wan_talk/setup.sh"
     if [ -x "$SETUP_SCRIPT" ]; then
         echo "running wan_talk setup..."
         bash "$SETUP_SCRIPT"
         echo "wan_talk setup complete"
+        
+        # Verify torch installation in venv
+        echo "Verifying torch installation..."
+        if ! "$VENV_PYTHON" -c "import torch; print(f'Torch version: {torch.__version__}')" 2>/dev/null; then
+            echo "ERROR: torch not found in venv after setup"
+            exit 1
+        fi
+        echo "✓ Torch successfully installed in venv"
     else
         echo "wan_talk setup script missing or not executable: $SETUP_SCRIPT"
         exit 1
@@ -152,8 +173,8 @@ if [ "$BACKEND" = "wan_talk" ]; then
         # Clear the model log before starting
         : > "$MODEL_LOG"
         
-        # Start ComfyUI with output to both MODEL_LOG and COMFY_LOG
-        nohup python main.py \
+        # Use python from venv
+        nohup "$VENV_PYTHON" main.py \
             --listen 127.0.0.1 \
             --port 8188 \
             --output-directory "$COMFY_ROOT/output" \
@@ -177,7 +198,7 @@ if [ "$BACKEND" = "wan_talk" ]; then
         done
         
         if [ "$COMFY_READY" = false ]; then
-            echo "ERROR: ComfyUI failed to start within 240 seconds"
+            echo "ERROR: ComfyUI failed to start within 120 seconds"
             echo "Last 50 lines of ComfyUI log:"
             tail -n 50 "$MODEL_LOG"
             exit 1
@@ -213,8 +234,8 @@ if [ "$BACKEND" = "wan_talk" ]; then
             echo "Using in-memory cache"
         fi
         
-        # Start API Wrapper
-        nohup uvicorn main:app \
+        # Use python from venv
+        nohup "$VENV_PYTHON" -m uvicorn main:app \
             --host 127.0.0.1 \
             --port 8000 \
             --workers 1 \
@@ -237,7 +258,7 @@ if [ "$BACKEND" = "wan_talk" ]; then
         done
         
         if [ "$WRAPPER_READY" = false ]; then
-            echo "ERROR: API Wrapper failed to start within 60 seconds"
+            echo "ERROR: API Wrapper failed to start within 120 seconds"
             echo "Last 50 lines of API Wrapper log:"
             tail -n 50 "$API_WRAPPER_LOG"
             exit 1
@@ -276,8 +297,8 @@ if [ "$BACKEND" != "wan_talk" ]; then
     [ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
 fi
 
-# Start PyWorker server
-(python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
+# Start PyWorker server using python from venv
+("$VENV_PYTHON" -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
 PYWORKER_PID=$!
 echo "PyWorker server started with PID $PYWORKER_PID"
 
