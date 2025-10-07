@@ -59,7 +59,7 @@ then
     fi
 
     # Fork testing
-    [[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/vast-ai/pyworker}" "$SERVER_DIR"
+    [[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/bidzy-app/pyworker-1}" "$SERVER_DIR"
     if [[ -n ${PYWORKER_REF:-} ]]; then
         (cd "$SERVER_DIR" && git checkout "$PYWORKER_REF")
     fi
@@ -135,7 +135,7 @@ if [ "$BACKEND" = "comfyui" ]; then
     if [ ! -f "$DEFAULT_WORKFLOWS_DIR/default.json" ]; then
         echo "Downloading default.json workflow..."
         wget -O "$DEFAULT_WORKFLOWS_DIR/default.json" \
-        https://raw.githubusercontent.com/bidzy-app/pyworker/main/workers/comfyui/misc/default_workflows/default.json
+        https://raw.githubusercontent.com/bidzy-app/pyworker-1/main/workers/comfyui/misc/default_workflows/default.json
     fi
 fi
 
