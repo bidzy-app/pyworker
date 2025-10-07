@@ -1,0 +1,286 @@
+{
+  "205": {
+    "inputs": {
+      "video": "19700121_0041_68dc4e6ae754819184377eca15478109.mp4",
+      "force_rate": 0,
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": [
+        "257",
+        0
+      ],
+      "skip_first_frames": 0,
+      "select_every_nth": 1,
+      "format": "AnimateDiff"
+    },
+    "class_type": "VHS_LoadVideo",
+    "_meta": {
+      "title": "Load Video (Upload) 🎥🅥🅗🅢"
+    }
+  },
+  "208": {
+    "inputs": {
+      "seed": 1645573664,
+      "num_inference_steps": 15,
+      "guidance_scale": 0,
+      "video_length": 10,
+      "mask_dilation_iter": 4,
+      "ref_stride": 10,
+      "neighbor_length": 10,
+      "subvideo_length": 50,
+      "video2mask": false,
+      "seg_repo": "briaai/RMBG-2.0",
+      "save_result_video": false,
+      "model": [
+        "237",
+        0
+      ],
+      "images": [
+        "290",
+        0
+      ],
+      "fps": [
+        "288",
+        0
+      ],
+      "video_mask": [
+        "289",
+        0
+      ]
+    },
+    "class_type": "DiffuEraserSampler",
+    "_meta": {
+      "title": "DiffuEraserSampler"
+    }
+  },
+  "209": {
+    "inputs": {
+      "frame_rate": [
+        "288",
+        0
+      ],
+      "loop_count": 0,
+      "filename_prefix": "AnimateDiff",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "208",
+        0
+      ],
+      "audio": [
+        "205",
+        2
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "237": {
+    "inputs": {
+      "checkpoint": "v1-5-pruned-emaonly-fp16.safetensors",
+      "lora": "pcm_sd15_smallcfg_2step_converted.safetensors"
+    },
+    "class_type": "DiffuEraserLoader",
+    "_meta": {
+      "title": "DiffuEraserLoader"
+    }
+  },
+  "257": {
+    "inputs": {
+      "value": 300
+    },
+    "class_type": "JWInteger",
+    "_meta": {
+      "title": "sora默认10秒300帧"
+    }
+  },
+  "258": {
+    "inputs": {
+      "width": [
+        "290",
+        3
+      ],
+      "height": [
+        "290",
+        4
+      ],
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "stretch",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "gpu",
+      "per_batch": 0,
+      "image": [
+        "287",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "267": {
+    "inputs": {
+      "boolean": [
+        "283",
+        0
+      ],
+      "on_true": [
+        "258",
+        0
+      ],
+      "on_false": [
+        "279",
+        0
+      ]
+    },
+    "class_type": "easy ifElse",
+    "_meta": {
+      "title": "If else"
+    }
+  },
+  "279": {
+    "inputs": {
+      "width": [
+        "290",
+        3
+      ],
+      "height": [
+        "290",
+        4
+      ],
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "stretch",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "gpu",
+      "per_batch": 0,
+      "image": [
+        "286",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "283": {
+    "inputs": {
+      "comparison": "a < b",
+      "a": [
+        "288",
+        8
+      ],
+      "b": [
+        "288",
+        9
+      ]
+    },
+    "class_type": "easy compare",
+    "_meta": {
+      "title": "Compare"
+    }
+  },
+  "284": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "JWInteger",
+    "_meta": {
+      "title": "Integer"
+    }
+  },
+  "286": {
+    "inputs": {
+      "image": "hori (1).png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "287": {
+    "inputs": {
+      "image": "vertical (1).png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "288": {
+    "inputs": {
+      "video_info": [
+        "205",
+        3
+      ]
+    },
+    "class_type": "VHS_VideoInfo",
+    "_meta": {
+      "title": "Video Info 🎥🅥🅗🅢"
+    }
+  },
+  "289": {
+    "inputs": {
+      "amount": [
+        "288",
+        6
+      ],
+      "image": [
+        "267",
+        0
+      ]
+    },
+    "class_type": "RepeatImageBatch",
+    "_meta": {
+      "title": "RepeatImageBatch"
+    }
+  },
+  "290": {
+    "inputs": {
+      "aspect_ratio": "original",
+      "proportional_width": 1,
+      "proportional_height": 1,
+      "fit": "letterbox",
+      "method": "lanczos",
+      "round_to_multiple": "8",
+      "scale_to_side": "None",
+      "scale_to_length": [
+        "284",
+        0
+      ],
+      "background_color": "#000000",
+      "image": [
+        "205",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: ImageScaleByAspectRatio V2",
+    "_meta": {
+      "title": "LayerUtility: ImageScaleByAspectRatio V2"
+    }
+  },
+  "291": {
+    "inputs": {
+      "anything": [
+        "208",
+        0
+      ]
+    },
+    "class_type": "easy cleanGpuUsed",
+    "_meta": {
+      "title": "Clean VRAM Used"
+    }
+  }
+}
