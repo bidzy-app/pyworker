@@ -19,7 +19,7 @@ with open("workers/comfyui/misc/test_prompts.txt", "r") as f:
 class Model(Enum):
     Flux = "flux"
     Sd3 = "sd3"
-    Default = "default"  # добавляем новую модель
+    Default = "default"  # ← добавляем
 
     def get_request_time(self) -> int:
         match self:
@@ -27,9 +27,8 @@ class Model(Enum):
                 return 23
             case Model.Sd3:
                 return 6
-            case Model.Default:  # задаём своё значение для Default
-                return 6  # можно подобрать любое разумное
-
+            case Model.Default:  # ← для Default можно взять любое время
+                return 6
 
 @cache
 def get_model() -> Model:

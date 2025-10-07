@@ -128,5 +128,16 @@ echo "launching PyWorker server"
 # from the run prior to reboot. past logs are saved in $MODEL_LOG.old for debugging only
 [ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
 
+# Ensure default workflow exists for comfyui
+if [ "$BACKEND" = "comfyui" ]; then
+    DEFAULT_WORKFLOWS_DIR="$SERVER_DIR/workers/comfyui/misc/default_workflows"
+    mkdir -p "$DEFAULT_WORKFLOWS_DIR"
+    if [ ! -f "$DEFAULT_WORKFLOWS_DIR/default.json" ]; then
+        echo "Downloading default.json workflow..."
+        wget -O "$DEFAULT_WORKFLOWS_DIR/default.json" \
+        https://raw.githubusercontent.com/bidzy-app/pyworker/main/workers/comfyui/misc/default_workflows/default.json
+    fi
+fi
+
 (python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
 echo "launching PyWorker server done"
