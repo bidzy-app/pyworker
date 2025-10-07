@@ -19,6 +19,7 @@ with open("workers/comfyui/misc/test_prompts.txt", "r") as f:
 class Model(Enum):
     Flux = "flux"
     Sd3 = "sd3"
+    Default = "default"  # добавляем новую модель
 
     def get_request_time(self) -> int:
         match self:
@@ -26,6 +27,8 @@ class Model(Enum):
                 return 23
             case Model.Sd3:
                 return 6
+            case Model.Default:  # задаём своё значение для Default
+                return 6  # можно подобрать любое разумное
 
 
 @cache
@@ -35,13 +38,14 @@ def get_model() -> Model:
             return Model.Flux
         case "sd3":
             return Model.Sd3
+        case "default":
+            return Model.Default
         case None:
             raise Exception(
                 "For comfyui pyworker, $COMFY_MODEL must be set in the vast template"
             )
         case model:
             raise Exception(f"Unsupported comfyui model: {model}")
-
 
 @cache
 def get_request_template() -> str:
